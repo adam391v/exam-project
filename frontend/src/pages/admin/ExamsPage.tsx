@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import AppSelect from '../../components/AppSelect';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { adminExamService, adminSubjectService } from '../../services/data.service';
@@ -30,6 +31,11 @@ export default function ExamsPage() {
       return result.data || [];
     },
   });
+
+  const subjectOptions = useMemo(() =>
+    (subjects || []).map((s: any) => ({ value: s.id, label: s.name })),
+    [subjects],
+  );
 
   const createMutation = useMutation({
     mutationFn: (dto: any) => adminExamService.create(dto),
@@ -180,10 +186,13 @@ export default function ExamsPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Môn học *</label>
-                <select required value={form.subjectId} onChange={(e) => setForm({ ...form, subjectId: e.target.value })} className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="">-- Chọn môn --</option>
-                  {subjects.map((s: any) => (<option key={s.id} value={s.id}>{s.name}</option>))}
-                </select>
+                <AppSelect
+                  value={subjectOptions.find(o => o.value === form.subjectId) || null}
+                  onChange={(opt) => setForm({ ...form, subjectId: opt?.value || '' })}
+                  options={subjectOptions}
+                  placeholder="-- Chọn môn --"
+                  isClearable
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

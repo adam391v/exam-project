@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AppSelect from '../../components/AppSelect';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminUserService } from '../../services/data.service';
 import { toast } from 'sonner';
@@ -164,11 +165,17 @@ export default function AdminUsersPage() {
               <div className="flex gap-4">
                 <div className="flex-1">
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Vai trò</label>
-                  <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="ADMIN">Admin</option>
-                    <option value="TEACHER">Giáo viên</option>
-                    <option value="SUPER_ADMIN">Super Admin</option>
-                  </select>
+                  <AppSelect
+                    value={{ value: form.role, label: roleLabels[form.role] || form.role }}
+                    onChange={(opt) => opt && setForm({ ...form, role: opt.value })}
+                    options={[
+                      { value: 'ADMIN', label: 'Admin' },
+                      { value: 'TEACHER', label: 'Giáo viên' },
+                      { value: 'SUPER_ADMIN', label: 'Super Admin' },
+                    ]}
+                    isSearchable={false}
+                    placeholder="Chọn vai trò"
+                  />
                 </div>
                 <label className="flex items-center gap-2 cursor-pointer self-end pb-2.5">
                   <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="w-4 h-4 rounded" />

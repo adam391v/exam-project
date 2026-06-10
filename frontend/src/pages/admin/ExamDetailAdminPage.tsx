@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import RichTextEditor from '../../components/RichTextEditor';
 import HtmlContent from '../../components/HtmlContent';
+import AppSelect from '../../components/AppSelect';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminExamService } from '../../services/data.service';
@@ -284,10 +285,16 @@ export default function ExamDetailAdminPage() {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Loại câu hỏi</label>
-                <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="SINGLE_CHOICE">Một đáp án</option>
-                  <option value="MULTIPLE_CHOICE">Nhiều đáp án</option>
-                </select>
+                <AppSelect
+                  value={{ value: form.type, label: form.type === 'SINGLE_CHOICE' ? 'Một đáp án' : 'Nhiều đáp án' }}
+                  onChange={(opt) => opt && setForm({ ...form, type: opt.value })}
+                  options={[
+                    { value: 'SINGLE_CHOICE', label: 'Một đáp án' },
+                    { value: 'MULTIPLE_CHOICE', label: 'Nhiều đáp án' },
+                  ]}
+                  isSearchable={false}
+                  placeholder="Chọn loại câu hỏi"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung câu hỏi *</label>
