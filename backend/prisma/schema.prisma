@@ -1,0 +1,214 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==================== ADMIN & AUTH ====================
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  TEACHER
+}
+
+model AdminUser {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  email     String?  @unique
+  password  String
+  fullName  String   @map("full_name")
+  role      Role     @default(TEACHER)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  auditLogs AuditLog[]
+
+  @@map("admin_users")
+}
+
+// ==================== SUBJECTS ====================
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String?
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  exams Exam[]
+
+  @@map("subjects")
+}
+
+// ==================== EXAMS ====================
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Exam {
+  id               String     @id @default(uuid())
+  title            String
+  subjectId        String     @map("subject_id")
+  duration         Int // phút
+  totalQuestions   Int        @default(0) @map("total_questions")
+  status           ExamStatus @default(DRAFT)
+  isPublic         Boolean    @default(false) @map("is_public")
+  showAnswer       Boolean    @default(false) @map("show_answer")
+  shuffleQuestions Boolean    @default(false) @map("shuffle_questions")
+  shuffleOptions   Boolean    @default(false) @map("shuffle_options")
+  passingScore     Float?     @map("passing_score")
+  description      String?
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  subject      Subject       @relation(fields: [subjectId], references: [id])
+  questions    Question[]
+  examSessions ExamSession[]
+
+  @@map("exams")
+}
+
+// ==================== QUESTIONS (thuộc trực tiếp vào Exam) ====================
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+}
+
+model Question {
+  id          String       @id @default(uuid())
+  examId      String       @map("exam_id")
+  content     String
+  imageUrl    String?      @map("image_url")
+  latex       String?
+  explanation String?
+  type        QuestionType @default(SINGLE_CHOICE)
+  difficulty  Int          @default(1)
+  sortOrder   Int          @default(0) @map("sort_order")
+  isActive    Boolean      @default(true) @map("is_active")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  exam    Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
+  options QuestionOption[]
+
+  @@map("questions")
+}
+
+model QuestionOption {
+  id         String  @id @default(uuid())
+  questionId String  @map("question_id")
+  label      String
+  content    String
+  isCorrect  Boolean @default(false) @map("is_correct")
+  sortOrder  Int     @default(0) @map("sort_order")
+
+  question    Question     @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  examAnswers ExamAnswer[]
+
+  @@map("question_options")
+}
+
+// ==================== EXAM SESSION ====================
+
+enum SessionStatus {
+  IN_PROGRESS
+  SUBMITTED
+  TIMED_OUT
+}
+
+model ExamSession {
+  id           String        @id @default(uuid())
+  examId       String        @map("exam_id")
+  studentName  String        @map("student_name")
+  studentClass String        @map("student_class")
+  startedAt    DateTime      @default(now()) @map("started_at")
+  submittedAt  DateTime?     @map("submitted_at")
+  status       SessionStatus @default(IN_PROGRESS)
+  ipAddress    String?       @map("ip_address")
+  userAgent    String?       @map("user_agent")
+  createdAt    DateTime      @default(now()) @map("created_at")
+
+  exam    Exam         @relation(fields: [examId], references: [id])
+  answers ExamAnswer[]
+  result  ExamResult?
+
+  @@map("exam_sessions")
+}
+
+// ==================== EXAM ANSWER ====================
+
+model ExamAnswer {
+  id               String   @id @default(uuid())
+  sessionId        String   @map("session_id")
+  questionId       String   @map("question_id")
+  selectedOptionId String?  @map("selected_option_id")
+  isMarked         Boolean  @default(false) @map("is_marked")
+  isViewed         Boolean  @default(false) @map("is_viewed")
+
+  session        ExamSession    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  selectedOption QuestionOption? @relation(fields: [selectedOptionId], references: [id])
+
+  @@unique([sessionId, questionId])
+  @@map("exam_answers")
+}
+
+// ==================== EXAM RESULT ====================
+
+model ExamResult {
+  id             String   @id @default(uuid())
+  sessionId      String   @unique @map("session_id")
+  totalQuestions Int      @map("total_questions")
+  correctAnswers Int      @map("correct_answers")
+  wrongAnswers   Int      @map("wrong_answers")
+  unanswered     Int
+  score          Float
+  timeTaken      Int      @map("time_taken")
+  isPassed       Boolean? @map("is_passed")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  session ExamSession @relation(fields: [sessionId], references: [id])
+
+  @@map("exam_results")
+}
+
+// ==================== AUDIT LOG ====================
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  oldValue  Json?    @map("old_value")
+  newValue  Json?    @map("new_value")
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user AdminUser? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// ==================== SYSTEM CONFIG ====================
+
+model SystemConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("system_configs")
+}

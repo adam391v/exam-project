@@ -1,0 +1,179 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+/* ===== CUSTOM THEME ===== */
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --color-primary: #2563EB;
+  --color-primary-dark: #1D4ED8;
+  --color-primary-light: #DBEAFE;
+  --color-accent: #F97316;
+  --color-accent-light: #FFF7ED;
+}
+
+/* ===== BASE STYLES ===== */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: #0F172A;
+  background-color: #F8FAFC;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar tùy chỉnh */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #F1F5F9;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* ===== QUESTION STATUS COLORS ===== */
+.q-answered {
+  background-color: #22C55E;
+  color: white;
+  border-color: #22C55E;
+}
+
+.q-answered:hover {
+  background-color: #16A34A;
+}
+
+.q-viewed {
+  background-color: #FB923C;
+  color: white;
+  border-color: #FB923C;
+}
+
+.q-viewed:hover {
+  background-color: #F97316;
+}
+
+.q-unviewed {
+  background-color: #E2E8F0;
+  color: #475569;
+  border-color: #CBD5E1;
+}
+
+.q-unviewed:hover {
+  background-color: #CBD5E1;
+}
+
+.q-current {
+  outline: 2px solid #2563EB;
+  outline-offset: 2px;
+}
+
+/* ===== KATEX ===== */
+.katex {
+  font-size: 1.1em !important;
+}
+
+/* ===== TIPTAP EDITOR ===== */
+.tiptap p.is-editor-empty:first-child::before {
+  color: #94A3B8;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.tiptap {
+  outline: none;
+}
+
+.tiptap p {
+  margin: 0.25em 0;
+}
+
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.5em;
+  margin: 0.25em 0;
+}
+
+.tiptap code {
+  background-color: #F1F5F9;
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+  font-size: 0.9em;
+  color: #E11D48;
+}
+
+.tiptap .Tiptap-mathematics-editor {
+  background: #FEF3C7;
+  border: 1px solid #FCD34D;
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.tiptap .Tiptap-mathematics-render {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tiptap .Tiptap-mathematics-render:hover {
+  background: #EFF6FF;
+  border-radius: 4px;
+}
+
+.tiptap .Tiptap-mathematics-render--editable {
+  cursor: text;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse-warning {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-pulse-warning {
+  animation: pulse-warning 1s ease-in-out infinite;
+}
