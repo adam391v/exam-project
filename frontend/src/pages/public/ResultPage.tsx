@@ -121,38 +121,55 @@ export default function ResultPage() {
           </button>
           {showReview && (
             <div className="mt-6 space-y-6">
-              {review.map((item, idx) => (
-                <div key={idx} className={`bg-white rounded-xl border p-5 ${item.isCorrect ? 'border-green-200' : 'border-red-200'}`}>
-                  <div className="flex items-start gap-3 mb-4">
-                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${item.isCorrect ? 'bg-green-100 text-green-700' : item.selectedOptionId ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span>
-                    <HtmlContent html={item.question.content} className="text-sm text-slate-800" />
-                  </div>
-                  <div className="space-y-2 ml-10">
-                    {item.options.map((opt) => {
-                      const isSelected = opt.id === item.selectedOptionId;
-                      const isCorrectOption = opt.isCorrect;
-                      let optionClass = 'flex items-center gap-3 p-2.5 rounded-lg text-sm ';
-                      if (isCorrectOption) optionClass += 'bg-green-50 text-green-800 font-medium';
-                      else if (isSelected && !isCorrectOption) optionClass += 'bg-red-50 text-red-800';
-                      else optionClass += 'text-slate-600';
-                      return (
-                        <div key={opt.id} className={optionClass}>
-                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isCorrectOption ? 'bg-green-200 text-green-800' : isSelected ? 'bg-red-200 text-red-800' : 'bg-slate-100'}`}>{opt.label}</span>
-                          <span>{opt.content}</span>
-                          {isCorrectOption && <CheckCircle2 className="w-4 h-4 text-green-600 ml-auto" />}
-                          {isSelected && !isCorrectOption && <XCircle className="w-4 h-4 text-red-500 ml-auto" />}
+              {review.map((item: any, idx: number) => {
+                // Hiển thị nội dung chung cho câu đầu tiên của group
+                const prevItem = idx > 0 ? review[idx - 1] : null;
+                const showGroupContent = item.question.groupContent &&
+                  (!prevItem || (prevItem as any).question.groupId !== item.question.groupId);
+                return (
+                  <div key={idx}>
+                    {showGroupContent && (
+                      <div className="mb-3 p-4 bg-purple-50/60 rounded-xl border border-purple-100">
+                        <p className="text-xs font-semibold text-purple-600 mb-2 uppercase tracking-wide">📖 Nội dung chung</p>
+                        <HtmlContent html={item.question.groupContent} className="text-sm text-slate-800 leading-relaxed" />
+                        {item.question.groupImageUrl && (
+                          <img src={item.question.groupImageUrl} alt="" className="mt-3 max-w-xs rounded-lg border border-purple-200" />
+                        )}
+                      </div>
+                    )}
+                    <div className={`bg-white rounded-xl border p-5 ${item.isCorrect ? 'border-green-200' : 'border-red-200'}`}>
+                      <div className="flex items-start gap-3 mb-4">
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${item.isCorrect ? 'bg-green-100 text-green-700' : item.selectedOptionId ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span>
+                        <HtmlContent html={item.question.content} className="text-sm text-slate-800" />
+                      </div>
+                      <div className="space-y-2 ml-10">
+                        {item.options.map((opt: any) => {
+                          const isSelected = opt.id === item.selectedOptionId;
+                          const isCorrectOption = opt.isCorrect;
+                          let optionClass = 'flex items-center gap-3 p-2.5 rounded-lg text-sm ';
+                          if (isCorrectOption) optionClass += 'bg-green-50 text-green-800 font-medium';
+                          else if (isSelected && !isCorrectOption) optionClass += 'bg-red-50 text-red-800';
+                          else optionClass += 'text-slate-600';
+                          return (
+                            <div key={opt.id} className={optionClass}>
+                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isCorrectOption ? 'bg-green-200 text-green-800' : isSelected ? 'bg-red-200 text-red-800' : 'bg-slate-100'}`}>{opt.label}</span>
+                              <span>{opt.content}</span>
+                              {isCorrectOption && <CheckCircle2 className="w-4 h-4 text-green-600 ml-auto" />}
+                              {isSelected && !isCorrectOption && <XCircle className="w-4 h-4 text-red-500 ml-auto" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {item.question.explanation && (
+                        <div className="mt-3 ml-10 p-3 bg-blue-50 rounded-lg">
+                          <p className="text-xs text-blue-600 font-medium mb-1">Giải thích:</p>
+                          <HtmlContent html={item.question.explanation} className="text-sm text-blue-800" />
                         </div>
-                      );
-                    })}
-                  </div>
-                  {item.question.explanation && (
-                    <div className="mt-3 ml-10 p-3 bg-blue-50 rounded-lg">
-                      <p className="text-xs text-blue-600 font-medium mb-1">Giải thích:</p>
-                      <HtmlContent html={item.question.explanation} className="text-sm text-blue-800" />
+                      )}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

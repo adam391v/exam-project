@@ -49,11 +49,12 @@ export class ResultService {
         },
       });
 
-      // Lấy câu hỏi trực tiếp từ exam
+      // Lấy câu hỏi trực tiếp từ exam (bao gồm group info)
       const questions = await this.prisma.question.findMany({
         where: { examId: session.examId },
         include: {
           options: { orderBy: { sortOrder: 'asc' } },
+          group: { select: { id: true, title: true, content: true, imageUrl: true } },
         },
         orderBy: { sortOrder: 'asc' },
       });
@@ -67,6 +68,10 @@ export class ResultService {
             imageUrl: q.imageUrl,
             latex: q.latex,
             explanation: q.explanation,
+            groupId: q.group?.id,
+            groupContent: q.group?.content,
+            groupTitle: q.group?.title,
+            groupImageUrl: q.group?.imageUrl,
           },
           options: q.options.map((opt) => ({
             id: opt.id,

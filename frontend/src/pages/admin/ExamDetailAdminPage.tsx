@@ -20,8 +20,10 @@ import {
   Clock,
   FileText,
   GripVertical,
+  Layers,
 } from 'lucide-react';
 
+// ===== Interfaces =====
 interface QuestionOption {
   id?: string;
   label: string;
@@ -37,14 +39,40 @@ interface QuestionForm {
   options: QuestionOption[];
 }
 
+interface SubQuestionForm {
+  content: string;
+  explanation: string;
+  type: string;
+  options: QuestionOption[];
+}
+
+interface GroupForm {
+  title: string;
+  content: string;
+  imageUrl: string;
+  questions: SubQuestionForm[];
+}
+
+const defaultOptions: QuestionOption[] = [
+  { label: 'A', content: '', isCorrect: false },
+  { label: 'B', content: '', isCorrect: false },
+  { label: 'C', content: '', isCorrect: false },
+  { label: 'D', content: '', isCorrect: false },
+];
+
 const defaultForm: QuestionForm = {
   content: '', explanation: '', type: 'SINGLE_CHOICE',
-  options: [
-    { label: 'A', content: '', isCorrect: false },
-    { label: 'B', content: '', isCorrect: false },
-    { label: 'C', content: '', isCorrect: false },
-    { label: 'D', content: '', isCorrect: false },
-  ],
+  options: defaultOptions.map(o => ({ ...o })),
+};
+
+const defaultSubQuestion: SubQuestionForm = {
+  content: '', explanation: '', type: 'SINGLE_CHOICE',
+  options: defaultOptions.map(o => ({ ...o })),
+};
+
+const defaultGroupForm: GroupForm = {
+  title: '', content: '', imageUrl: '',
+  questions: [{ ...defaultSubQuestion, options: defaultOptions.map(o => ({ ...o })) }],
 };
 
 export default function ExamDetailAdminPage() {
@@ -53,10 +81,14 @@ export default function ExamDetailAdminPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [showQuestionModal, setShowQuestionModal] = useState(false);
+  const [showGroupModal, setShowGroupModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [form, setForm] = useState<QuestionForm>({ ...defaultForm });
+  const [groupForm, setGroupForm] = useState<GroupForm>({ ...defaultGroupForm });
 
   // Lấy chi tiết đề thi + câu hỏi
   const { data: exam, isLoading } = useQuery({
@@ -65,34 +97,54 @@ export default function ExamDetailAdminPage() {
     enabled: !!examId,
   });
 
-  // Mutations
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin-exam-detail', examId] });
+
+  // === Mutations: Câu đơn ===
   const addMutation = useMutation({
     mutationFn: (dto: any) => adminExamService.addQuestion(examId!, dto),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin-exam-detail', examId] }); toast.success('Thêm câu hỏi thành công'); closeModal(); },
+    onSuccess: () => { invalidate(); toast.success('Thêm câu hỏi thành công'); closeModal(); },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Lỗi'),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ questionId, dto }: { questionId: string; dto: any }) => adminExamService.updateQuestion(examId!, questionId, dto),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin-exam-detail', examId] }); toast.success('Cập nhật thành công'); closeModal(); },
+    onSuccess: () => { invalidate(); toast.success('Cập nhật thành công'); closeModal(); },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Lỗi'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (questionId: string) => adminExamService.removeQuestion(examId!, questionId),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin-exam-detail', examId] }); toast.success('Đã xoá câu hỏi'); },
+    onSuccess: () => { invalidate(); toast.success('Đã xoá câu hỏi'); },
+  });
+
+  // === Mutations: Câu chùm ===
+  const addGroupMutation = useMutation({
+    mutationFn: (dto: any) => adminExamService.addQuestionGroup(examId!, dto),
+    onSuccess: () => { invalidate(); toast.success('Thêm câu hỏi chùm thành công'); closeGroupModal(); },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Lỗi'),
+  });
+
+  const updateGroupMutation = useMutation({
+    mutationFn: ({ groupId, dto }: { groupId: string; dto: any }) => adminExamService.updateQuestionGroup(examId!, groupId, dto),
+    onSuccess: () => { invalidate(); toast.success('Cập nhật nhóm thành công'); closeGroupModal(); },
+    onError: (err: any) => toast.error(err.response?.data?.message || 'Lỗi'),
+  });
+
+  const deleteGroupMutation = useMutation({
+    mutationFn: (groupId: string) => adminExamService.removeQuestionGroup(examId!, groupId),
+    onSuccess: () => { invalidate(); toast.success('Đã xoá nhóm câu hỏi'); },
   });
 
   const publishMutation = useMutation({
     mutationFn: () => adminExamService.publish(examId!),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin-exam-detail', examId] }); toast.success('Đã công khai đề thi'); },
+    onSuccess: () => { invalidate(); toast.success('Đã công khai đề thi'); },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Lỗi'),
   });
 
   const importMutation = useMutation({
     mutationFn: (file: File) => adminExamService.importQuestions(examId!, file),
     onSuccess: (result: any) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-exam-detail', examId] });
+      invalidate();
       toast.success(`Import thành công ${result.imported} câu hỏi`);
       if (result.failed > 0) toast.warning(`${result.failed} câu bị lỗi`);
       setShowImportModal(false);
@@ -100,10 +152,10 @@ export default function ExamDetailAdminPage() {
     onError: (err: any) => toast.error(err.response?.data?.message || 'Lỗi import'),
   });
 
-  // Handlers
+  // === Handlers: Câu đơn ===
   const openCreate = () => {
     setEditingQuestionId(null);
-    setForm({ ...defaultForm, options: defaultForm.options.map(o => ({ ...o })) });
+    setForm({ ...defaultForm, options: defaultOptions.map(o => ({ ...o })) });
     setShowQuestionModal(true);
   };
 
@@ -125,12 +177,6 @@ export default function ExamDetailAdminPage() {
     else { addMutation.mutate(form); }
   };
 
-  const handleImport = () => {
-    const file = fileInputRef.current?.files?.[0];
-    if (!file) { toast.error('Chọn file Excel'); return; }
-    importMutation.mutate(file);
-  };
-
   const updateOption = (idx: number, field: string, value: any) => {
     const opts = [...form.options];
     (opts[idx] as any)[field] = value;
@@ -140,11 +186,91 @@ export default function ExamDetailAdminPage() {
     setForm({ ...form, options: opts });
   };
 
+  // === Handlers: Câu chùm ===
+  const openCreateGroup = () => {
+    setEditingGroupId(null);
+    setGroupForm({
+      title: '', content: '', imageUrl: '',
+      questions: [{ ...defaultSubQuestion, options: defaultOptions.map(o => ({ ...o })) }],
+    });
+    setShowGroupModal(true);
+  };
+
+  const openEditGroup = (g: any) => {
+    setEditingGroupId(g.id);
+    setGroupForm({
+      title: g.title || '', content: g.content || '', imageUrl: g.imageUrl || '',
+      questions: g.questions?.map((q: any) => ({
+        content: q.content, explanation: q.explanation || '', type: q.type || 'SINGLE_CHOICE',
+        options: q.options?.map((o: any) => ({ label: o.label, content: o.content, isCorrect: o.isCorrect })) || defaultOptions.map(o => ({ ...o })),
+      })) || [],
+    });
+    setShowGroupModal(true);
+  };
+
+  const closeGroupModal = () => { setShowGroupModal(false); setEditingGroupId(null); };
+
+  const handleGroupSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!groupForm.content.trim()) { toast.error('Nội dung chung không được để trống'); return; }
+    if (groupForm.questions.length === 0) { toast.error('Phải có ít nhất 1 câu hỏi con'); return; }
+    for (let i = 0; i < groupForm.questions.length; i++) {
+      if (!groupForm.questions[i].options.some(o => o.isCorrect)) {
+        toast.error(`Câu hỏi con ${i + 1}: phải chọn đáp án đúng`); return;
+      }
+    }
+    if (editingGroupId) {
+      updateGroupMutation.mutate({ groupId: editingGroupId, dto: groupForm });
+    } else {
+      addGroupMutation.mutate(groupForm);
+    }
+  };
+
+  const addSubQuestion = () => {
+    setGroupForm({
+      ...groupForm,
+      questions: [...groupForm.questions, { ...defaultSubQuestion, options: defaultOptions.map(o => ({ ...o })) }],
+    });
+  };
+
+  const removeSubQuestion = (idx: number) => {
+    if (groupForm.questions.length <= 1) return;
+    setGroupForm({ ...groupForm, questions: groupForm.questions.filter((_, i) => i !== idx) });
+  };
+
+  const updateSubQuestion = (idx: number, field: string, value: any) => {
+    const qs = [...groupForm.questions];
+    (qs[idx] as any)[field] = value;
+    setGroupForm({ ...groupForm, questions: qs });
+  };
+
+  const updateSubOption = (qIdx: number, oIdx: number, field: string, value: any) => {
+    const qs = [...groupForm.questions];
+    const opts = [...qs[qIdx].options];
+    (opts[oIdx] as any)[field] = value;
+    if (field === 'isCorrect' && qs[qIdx].type === 'SINGLE_CHOICE' && value) {
+      opts.forEach((o, i) => { if (i !== oIdx) o.isCorrect = false; });
+    }
+    qs[qIdx] = { ...qs[qIdx], options: opts };
+    setGroupForm({ ...groupForm, questions: qs });
+  };
+
+  // === Misc ===
+  const handleImport = () => {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) { toast.error('Chọn file Excel'); return; }
+    importMutation.mutate(file);
+  };
+
   const statusMap: Record<string, { label: string; color: string }> = {
     DRAFT: { label: 'Nháp', color: 'bg-slate-100 text-slate-700' },
     PUBLISHED: { label: 'Công khai', color: 'bg-green-100 text-green-700' },
     ARCHIVED: { label: 'Lưu trữ', color: 'bg-orange-100 text-orange-700' },
   };
+
+  // Tính tổng câu hỏi thực tế
+  const totalQuestions = (exam?.questions?.length || 0) +
+    (exam?.questionGroups?.reduce((sum: number, g: any) => sum + (g.questions?.length || 0), 0) || 0);
 
   if (isLoading) {
     return (
@@ -167,6 +293,32 @@ export default function ExamDetailAdminPage() {
 
   const status = statusMap[exam.status] || statusMap.DRAFT;
 
+  // Merge câu đơn + groups theo sortOrder để hiển thị xen kẽ
+  const mergedItems: Array<{ type: 'single'; sortOrder: number; data: any; idx: number } | { type: 'group'; sortOrder: number; data: any }> = [];
+  let questionIdx = 0;
+
+  (exam.questions || []).forEach((q: any) => {
+    mergedItems.push({ type: 'single', sortOrder: q.sortOrder ?? 0, data: q, idx: questionIdx++ });
+  });
+  (exam.questionGroups || []).forEach((g: any) => {
+    mergedItems.push({ type: 'group', sortOrder: g.sortOrder ?? 0, data: g });
+  });
+  mergedItems.sort((a, b) => a.sortOrder - b.sortOrder);
+
+  // Đánh số câu liên tục
+  let globalIdx = 0;
+  const numberedItems = mergedItems.map(item => {
+    if (item.type === 'single') {
+      globalIdx++;
+      return { ...item, number: globalIdx };
+    } else {
+      const startNum = globalIdx + 1;
+      const count = item.data.questions?.length || 0;
+      globalIdx += count;
+      return { ...item, startNumber: startNum, endNumber: globalIdx };
+    }
+  });
+
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
@@ -186,11 +338,11 @@ export default function ExamDetailAdminPage() {
             <div className="flex items-center gap-5 text-sm text-slate-500">
               <span className="flex items-center gap-1.5"><FileText className="w-4 h-4" />{exam.subject?.name}</span>
               <span className="flex items-center gap-1.5"><Clock className="w-4 h-4" />{exam.duration} phút</span>
-              <span className="flex items-center gap-1.5"><Globe className="w-4 h-4" />{exam.questions?.length || 0} câu hỏi</span>
+              <span className="flex items-center gap-1.5"><Globe className="w-4 h-4" />{totalQuestions} câu hỏi</span>
             </div>
           </div>
           {exam.status !== 'PUBLISHED' && (
-            <button onClick={() => publishMutation.mutate()} disabled={publishMutation.isPending || !exam.questions?.length}
+            <button onClick={() => publishMutation.mutate()} disabled={publishMutation.isPending || totalQuestions === 0}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 shadow-sm transition-all">
               <Globe className="w-4 h-4" /> Công khai
             </button>
@@ -201,10 +353,13 @@ export default function ExamDetailAdminPage() {
       {/* Questions Section */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-base font-bold text-slate-900">Danh sách câu hỏi ({exam.questions?.length || 0})</h2>
+          <h2 className="text-base font-bold text-slate-900">Danh sách câu hỏi ({totalQuestions})</h2>
           <div className="flex gap-2">
             <button onClick={() => setShowImportModal(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all">
               <Upload className="w-3.5 h-3.5" /> Import Excel
+            </button>
+            <button onClick={openCreateGroup} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 transition-all">
+              <Layers className="w-3.5 h-3.5" /> Thêm câu chùm
             </button>
             <button onClick={openCreate} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all">
               <Plus className="w-3.5 h-3.5" /> Thêm câu hỏi
@@ -212,151 +367,323 @@ export default function ExamDetailAdminPage() {
           </div>
         </div>
 
-        {/* Question List */}
+        {/* Merged List */}
         <div className="divide-y divide-slate-100">
-          {(!exam.questions || exam.questions.length === 0) ? (
+          {numberedItems.length === 0 ? (
             <div className="px-6 py-12 text-center">
               <FileText className="w-12 h-12 mx-auto mb-3 text-slate-300" />
               <p className="text-slate-500 text-sm mb-1">Chưa có câu hỏi nào</p>
               <p className="text-slate-400 text-xs">Thêm câu hỏi thủ công hoặc import từ Excel</p>
             </div>
-          ) : exam.questions.map((q: any, idx: number) => {
-            const isExpanded = expandedQuestion === q.id;
-            const correctOpts = q.options?.filter((o: any) => o.isCorrect).map((o: any) => o.label).join(', ');
-            return (
-              <div key={q.id} className="group">
-                {/* Question Header */}
-                <div className="flex items-center gap-3 px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setExpandedQuestion(isExpanded ? null : q.id)}>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <GripVertical className="w-4 h-4 text-slate-300" />
-                    <span className="w-7 h-7 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">{idx + 1}</span>
-                  </div>
-                  <div className="flex-1 text-sm text-slate-800 line-clamp-1"><HtmlContent html={q.content} className="[&>*]:my-0 inline" /></div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className="text-xs text-slate-400 hidden sm:block">Đáp án: <span className="font-semibold text-green-600">{correctOpts}</span></span>
-                    <span className="text-xs bg-slate-100 px-2 py-0.5 rounded">{q.type === 'SINGLE_CHOICE' ? 'Một' : 'Nhiều'}</span>
-                    {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                  </div>
-                </div>
-
-                {/* Expanded Detail */}
-                {isExpanded && (
-                  <div className="px-6 pb-4 bg-slate-50 border-t border-slate-100">
-                    <div className="pl-12 pt-3 space-y-2">
-                      {q.options?.map((opt: any) => (
-                        <div key={opt.id} className={`flex items-center gap-3 p-2.5 rounded-lg text-sm ${opt.isCorrect ? 'bg-green-50 text-green-800 font-medium' : 'text-slate-600'}`}>
-                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${opt.isCorrect ? 'bg-green-200 text-green-800' : 'bg-slate-200 text-slate-600'}`}>{opt.label}</span>
-                          <span className="flex-1">{opt.content}</span>
-                          {opt.isCorrect && <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />}
-                        </div>
-                      ))}
-                      {q.explanation && (
-                        <div className="mt-2 p-3 bg-blue-50 rounded-lg">
-                          <p className="text-xs text-blue-600 font-medium mb-0.5">Giải thích:</p>
-                          <HtmlContent html={q.explanation} className="text-sm text-blue-800" />
-                        </div>
-                      )}
-                      <div className="flex gap-2 pt-2">
-                        <button onClick={(e) => { e.stopPropagation(); openEdit(q); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all">
-                          <Pencil className="w-3.5 h-3.5" /> Sửa
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Xoá câu hỏi này?')) deleteMutation.mutate(q.id); }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-all">
-                          <Trash2 className="w-3.5 h-3.5" /> Xoá
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
+          ) : numberedItems.map((item: any, idx: number) => {
+            if (item.type === 'single') {
+              return renderSingleQuestion(item.data, item.number, idx);
+            } else {
+              return renderQuestionGroup(item.data, item.startNumber, item.endNumber, idx);
+            }
           })}
         </div>
       </div>
 
-      {/* ===== Question Create/Edit Modal ===== */}
-      {showQuestionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white z-10">
-              <h3 className="text-lg font-bold text-slate-900">{editingQuestionId ? 'Sửa câu hỏi' : 'Thêm câu hỏi mới'}</h3>
-              <button onClick={closeModal} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Loại câu hỏi</label>
-                <AppSelect
-                  value={{ value: form.type, label: form.type === 'SINGLE_CHOICE' ? 'Một đáp án' : 'Nhiều đáp án' }}
-                  onChange={(opt) => opt && setForm({ ...form, type: opt.value })}
-                  options={[
-                    { value: 'SINGLE_CHOICE', label: 'Một đáp án' },
-                    { value: 'MULTIPLE_CHOICE', label: 'Nhiều đáp án' },
-                  ]}
-                  isSearchable={false}
-                  placeholder="Chọn loại câu hỏi"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung câu hỏi *</label>
-                <RichTextEditor content={form.content} onChange={(html) => setForm({ ...form, content: html })} placeholder="Nhập nội dung câu hỏi... (hỗ trợ LaTeX: $\frac{a}{b}$)" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Đáp án *</label>
-                <div className="space-y-3">
-                  {form.options.map((opt, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
-                        <input type={form.type === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'} name="correct" checked={opt.isCorrect} onChange={(e) => updateOption(idx, 'isCorrect', e.target.checked)}
-                          className="w-4 h-4 text-green-600 focus:ring-green-500" />
-                        <span className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-700">{opt.label}</span>
-                      </label>
-                      <input type="text" value={opt.content} onChange={(e) => updateOption(idx, 'content', e.target.value)}
-                        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={`Nội dung đáp án ${opt.label}`} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Giải thích</label>
-                <RichTextEditor content={form.explanation} onChange={(html) => setForm({ ...form, explanation: html })} placeholder="Giải thích đáp án (không bắt buộc)" />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
-                <button type="submit" disabled={addMutation.isPending || updateMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">{editingQuestionId ? 'Cập nhật' : 'Tạo mới'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* ===== Single Question Modal ===== */}
+      {showQuestionModal && renderQuestionModal()}
+
+      {/* ===== Group Modal ===== */}
+      {showGroupModal && renderGroupModal()}
 
       {/* ===== Import Modal ===== */}
-      {showImportModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-900">Import câu hỏi từ Excel</h3>
-              <button onClick={() => setShowImportModal(false)} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className="bg-blue-50 rounded-xl p-4">
-                <p className="text-xs text-blue-700 font-medium mb-1">Cấu trúc file Excel:</p>
-                <p className="text-xs text-blue-600">Câu hỏi | A | B | C | D | Đáp án đúng | Giải thích</p>
-                <p className="text-xs text-blue-500 mt-1">Hàng 1 là header. Đáp án đúng: A, B, C, D (hoặc AB, AC...)</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">File Excel</label>
-                <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-              </div>
-              <div className="flex gap-3 pt-2">
-                <button onClick={() => setShowImportModal(false)} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
-                <button onClick={handleImport} disabled={importMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">
-                  {importMutation.isPending ? 'Đang import...' : 'Import'}
+      {showImportModal && renderImportModal()}
+    </div>
+  );
+
+  // ======================== RENDER HELPERS ========================
+
+  function renderSingleQuestion(q: any, number: number, key: number) {
+    const isExpanded = expandedQuestion === q.id;
+    const correctOpts = q.options?.filter((o: any) => o.isCorrect).map((o: any) => o.label).join(', ');
+    return (
+      <div key={`single-${key}`} className="group">
+        <div className="flex items-center gap-3 px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setExpandedQuestion(isExpanded ? null : q.id)}>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <GripVertical className="w-4 h-4 text-slate-300" />
+            <span className="w-7 h-7 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center text-xs font-bold">{number}</span>
+          </div>
+          <div className="flex-1 text-sm text-slate-800 line-clamp-1"><HtmlContent html={q.content} className="[&>*]:my-0 inline" /></div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className="text-xs text-slate-400 hidden sm:block">Đáp án: <span className="font-semibold text-green-600">{correctOpts}</span></span>
+            <span className="text-xs bg-slate-100 px-2 py-0.5 rounded">{q.type === 'SINGLE_CHOICE' ? 'Một' : 'Nhiều'}</span>
+            {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+          </div>
+        </div>
+        {isExpanded && (
+          <div className="px-6 pb-4 bg-slate-50 border-t border-slate-100">
+            <div className="pl-12 pt-3 space-y-2">
+              {q.options?.map((opt: any) => (
+                <div key={opt.id} className={`flex items-center gap-3 p-2.5 rounded-lg text-sm ${opt.isCorrect ? 'bg-green-50 text-green-800 font-medium' : 'text-slate-600'}`}>
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${opt.isCorrect ? 'bg-green-200 text-green-800' : 'bg-slate-200 text-slate-600'}`}>{opt.label}</span>
+                  <span className="flex-1">{opt.content}</span>
+                  {opt.isCorrect && <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />}
+                </div>
+              ))}
+              {q.explanation && (
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-xs text-blue-600 font-medium mb-0.5">Giải thích:</p>
+                  <HtmlContent html={q.explanation} className="text-sm text-blue-800" />
+                </div>
+              )}
+              <div className="flex gap-2 pt-2">
+                <button onClick={(e) => { e.stopPropagation(); openEdit(q); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all">
+                  <Pencil className="w-3.5 h-3.5" /> Sửa
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Xoá câu hỏi này?')) deleteMutation.mutate(q.id); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-all">
+                  <Trash2 className="w-3.5 h-3.5" /> Xoá
                 </button>
               </div>
             </div>
           </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderQuestionGroup(g: any, startNum: number, endNum: number, key: number) {
+    const isExpanded = expandedGroup === g.id;
+    const subCount = g.questions?.length || 0;
+    return (
+      <div key={`group-${key}`} className="group">
+        <div className="flex items-center gap-3 px-6 py-4 cursor-pointer hover:bg-purple-50/50 transition-colors bg-purple-50/30" onClick={() => setExpandedGroup(isExpanded ? null : g.id)}>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <GripVertical className="w-4 h-4 text-purple-300" />
+            <span className="px-2.5 py-1 bg-purple-100 text-purple-700 rounded-lg flex items-center gap-1.5 text-xs font-bold">
+              <Layers className="w-3.5 h-3.5" />
+              {startNum}–{endNum}
+            </span>
+          </div>
+          <div className="flex-1">
+            <span className="text-sm font-medium text-purple-800">{g.title || 'Câu hỏi chùm'}</span>
+            <span className="text-xs text-purple-500 ml-2">({subCount} câu con)</span>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={(e) => { e.stopPropagation(); openEditGroup(g); }} className="p-1.5 text-purple-400 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-all">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Xoá nhóm câu hỏi?')) deleteGroupMutation.mutate(g.id); }} className="p-1.5 text-purple-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+            {isExpanded ? <ChevronUp className="w-4 h-4 text-purple-400" /> : <ChevronDown className="w-4 h-4 text-purple-400" />}
+          </div>
         </div>
-      )}
-    </div>
-  );
+        {isExpanded && (
+          <div className="px-6 pb-4 bg-purple-50/20 border-t border-purple-100">
+            <div className="pl-8 pt-3">
+              {/* Nội dung chung */}
+              <div className="p-4 bg-purple-50 rounded-xl mb-4 border border-purple-100">
+                <p className="text-xs text-purple-600 font-semibold mb-2">📖 Nội dung chung:</p>
+                <HtmlContent html={g.content} className="text-sm text-slate-800 leading-relaxed" />
+                {g.imageUrl && <img src={g.imageUrl} alt="" className="mt-3 max-w-xs rounded-lg border" />}
+              </div>
+              {/* Câu hỏi con */}
+              <div className="space-y-3">
+                {g.questions?.map((q: any, qIdx: number) => {
+                  const correctOpts = q.options?.filter((o: any) => o.isCorrect).map((o: any) => o.label).join(', ');
+                  return (
+                    <div key={q.id} className="p-3 bg-white rounded-lg border border-slate-200">
+                      <div className="flex items-start gap-2">
+                        <span className="w-6 h-6 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">{startNum + qIdx}</span>
+                        <div className="flex-1">
+                          <HtmlContent html={q.content} className="text-sm text-slate-800 [&>*]:my-0" />
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {q.options?.map((o: any) => (
+                              <span key={o.id} className={`text-xs px-2 py-0.5 rounded ${o.isCorrect ? 'bg-green-100 text-green-700 font-semibold' : 'bg-slate-100 text-slate-500'}`}>
+                                {o.label}: {o.content}
+                              </span>
+                            ))}
+                          </div>
+                          <span className="text-xs text-slate-400 mt-1 inline-block">Đáp án: <span className="font-semibold text-green-600">{correctOpts}</span></span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function renderQuestionModal() {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white z-10">
+            <h3 className="text-lg font-bold text-slate-900">{editingQuestionId ? 'Sửa câu hỏi' : 'Thêm câu hỏi mới'}</h3>
+            <button onClick={closeModal} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+          </div>
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Loại câu hỏi</label>
+              <AppSelect
+                value={{ value: form.type, label: form.type === 'SINGLE_CHOICE' ? 'Một đáp án' : 'Nhiều đáp án' }}
+                onChange={(opt) => opt && setForm({ ...form, type: opt.value })}
+                options={[
+                  { value: 'SINGLE_CHOICE', label: 'Một đáp án' },
+                  { value: 'MULTIPLE_CHOICE', label: 'Nhiều đáp án' },
+                ]}
+                isSearchable={false}
+                placeholder="Chọn loại câu hỏi"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung câu hỏi *</label>
+              <RichTextEditor content={form.content} onChange={(html) => setForm({ ...form, content: html })} placeholder="Nhập nội dung câu hỏi... (hỗ trợ LaTeX: $\frac{a}{b}$)" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Đáp án *</label>
+              <div className="space-y-3">
+                {form.options.map((opt, idx) => (
+                  <div key={idx} className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
+                      <input type={form.type === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'} name="correct" checked={opt.isCorrect} onChange={(e) => updateOption(idx, 'isCorrect', e.target.checked)}
+                        className="w-4 h-4 text-green-600 focus:ring-green-500" />
+                      <span className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-700">{opt.label}</span>
+                    </label>
+                    <input type="text" value={opt.content} onChange={(e) => updateOption(idx, 'content', e.target.value)}
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={`Nội dung đáp án ${opt.label}`} />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Giải thích</label>
+              <RichTextEditor content={form.explanation} onChange={(html) => setForm({ ...form, explanation: html })} placeholder="Giải thích đáp án (không bắt buộc)" />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
+              <button type="submit" disabled={addMutation.isPending || updateMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">{editingQuestionId ? 'Cập nhật' : 'Tạo mới'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  function renderGroupModal() {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-fade-in">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white z-10">
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Layers className="w-5 h-5 text-purple-600" />
+              {editingGroupId ? 'Sửa câu hỏi chùm' : 'Thêm câu hỏi chùm'}
+            </h3>
+            <button onClick={closeGroupModal} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+          </div>
+          <form onSubmit={handleGroupSubmit} className="p-6 space-y-5">
+            {/* Group Info */}
+            <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 space-y-4">
+              <p className="text-sm font-semibold text-purple-800">📖 Thông tin nội dung chung</p>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Tiêu đề nhóm</label>
+                <input type="text" value={groupForm.title} onChange={(e) => setGroupForm({ ...groupForm, title: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="VD: Đọc hiểu đoạn văn..." />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung chung * (Rich Text + LaTeX)</label>
+                <RichTextEditor content={groupForm.content} onChange={(html) => setGroupForm({ ...groupForm, content: html })} placeholder="Nhập đoạn văn, bài toán, bảng dữ liệu..." />
+              </div>
+            </div>
+
+            {/* Sub Questions */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-800">Danh sách câu hỏi con ({groupForm.questions.length})</p>
+                <button type="button" onClick={addSubQuestion} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 transition-all">
+                  <Plus className="w-3.5 h-3.5" /> Thêm câu con
+                </button>
+              </div>
+
+              {groupForm.questions.map((subQ, qIdx) => (
+                <div key={qIdx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-slate-700">Câu {qIdx + 1}</span>
+                    {groupForm.questions.length > 1 && (
+                      <button type="button" onClick={() => removeSubQuestion(qIdx)} className="p-1 text-slate-400 hover:text-red-600 transition-colors"><X className="w-4 h-4" /></button>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Nội dung câu hỏi *</label>
+                    <RichTextEditor content={subQ.content} onChange={(html) => updateSubQuestion(qIdx, 'content', html)} placeholder="Nội dung câu hỏi con..." />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1.5">Đáp án *</label>
+                    <div className="space-y-2">
+                      {subQ.options.map((opt, oIdx) => (
+                        <div key={oIdx} className="flex items-center gap-2">
+                          <label className="flex items-center gap-1.5 cursor-pointer flex-shrink-0">
+                            <input type="radio" name={`sub-correct-${qIdx}`} checked={opt.isCorrect} onChange={() => updateSubOption(qIdx, oIdx, 'isCorrect', true)}
+                              className="w-3.5 h-3.5 text-green-600 focus:ring-green-500" />
+                            <span className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">{opt.label}</span>
+                          </label>
+                          <input type="text" value={opt.content} onChange={(e) => updateSubOption(qIdx, oIdx, 'content', e.target.value)}
+                            className="flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder={`Đáp án ${opt.label}`} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Giải thích</label>
+                    <RichTextEditor content={subQ.explanation} onChange={(html) => updateSubQuestion(qIdx, 'explanation', html)} placeholder="Giải thích (tuỳ chọn)" />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button type="button" onClick={closeGroupModal} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
+              <button type="submit" disabled={addGroupMutation.isPending || updateGroupMutation.isPending}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 transition-all">
+                {editingGroupId ? 'Cập nhật' : 'Tạo nhóm'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  function renderImportModal() {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <h3 className="text-lg font-bold text-slate-900">Import câu hỏi từ Excel</h3>
+            <button onClick={() => setShowImportModal(false)} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="bg-blue-50 rounded-xl p-4 space-y-2">
+              <p className="text-xs text-blue-700 font-medium">Format câu đơn (7 cột):</p>
+              <p className="text-xs text-blue-600">Câu hỏi | A | B | C | D | Đáp án đúng | Giải thích</p>
+              <hr className="border-blue-200" />
+              <p className="text-xs text-blue-700 font-medium">Format hỗ trợ câu chùm (9 cột):</p>
+              <p className="text-xs text-blue-600">Loại | Nội dung chung | Câu hỏi | A | B | C | D | Đáp án | Giải thích</p>
+              <p className="text-xs text-blue-500 mt-1">Cột "Loại" = CHÙM → bắt đầu nhóm mới</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">File Excel</label>
+              <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setShowImportModal(false)} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
+              <button onClick={handleImport} disabled={importMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">
+                {importMutation.isPending ? 'Đang import...' : 'Import'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }

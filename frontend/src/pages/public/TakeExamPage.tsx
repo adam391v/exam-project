@@ -306,10 +306,21 @@ export default function TakeExamPage() {
               </button>
             </div>
 
+            {/* Nội dung chung (câu hỏi chùm) */}
+            {currentQuestion.groupContent && (
+              <div className="mb-6 p-4 sm:p-5 bg-purple-50/60 rounded-xl border border-purple-100">
+                <p className="text-xs font-semibold text-purple-600 mb-2 uppercase tracking-wide">📖 Nội dung chung</p>
+                <HtmlContent html={currentQuestion.groupContent} className="text-sm text-slate-800 leading-relaxed" />
+                {currentQuestion.groupImageUrl && (
+                  <img src={currentQuestion.groupImageUrl} alt="Hình minh họa" className="mt-3 max-w-md rounded-xl border border-purple-200" />
+                )}
+              </div>
+            )}
+
             {/* Nội dung câu hỏi */}
             <div className="mb-8">
               <HtmlContent html={currentQuestion.content} className="text-base text-slate-800 leading-relaxed" />
-              {currentQuestion.imageUrl && (
+              {currentQuestion.imageUrl && !currentQuestion.groupContent && (
                 <img
                   src={currentQuestion.imageUrl}
                   alt="Hình minh họa"

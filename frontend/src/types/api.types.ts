@@ -89,6 +89,11 @@ export interface Question {
   difficulty: number;
   options: QuestionOption[];
   subject?: { id: string; name: string; code: string };
+  // Câu hỏi chùm (group) fields
+  groupId?: string;
+  groupContent?: string;
+  groupImageUrl?: string;
+  groupTitle?: string;
 }
 
 // ===== Exam Session Types =====

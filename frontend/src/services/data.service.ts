@@ -124,6 +124,20 @@ export const adminExamService = {
     });
     return data.data;
   },
+
+  // ===== Question Group CRUD =====
+  addQuestionGroup: async (examId: string, dto: any) => {
+    const { data } = await api.post(`/admin/exams/${examId}/question-groups`, dto);
+    return data.data;
+  },
+  updateQuestionGroup: async (examId: string, groupId: string, dto: any) => {
+    const { data } = await api.put(`/admin/exams/${examId}/question-groups/${groupId}`, dto);
+    return data.data;
+  },
+  removeQuestionGroup: async (examId: string, groupId: string) => {
+    const { data } = await api.delete(`/admin/exams/${examId}/question-groups/${groupId}`);
+    return data.data;
+  },
 };
 
 export const adminResultService = {

@@ -99,16 +99,28 @@ export class ExamService {
     return new PaginatedResult(data, total, page, limit);
   }
 
-  /** Admin: Chi tiết đề thi kèm danh sách câu hỏi */
+  /** Admin: Chi tiết đề thi kèm danh sách câu hỏi + câu hỏi chùm */
   async findOne(id: string) {
     const exam = await this.prisma.exam.findUnique({
       where: { id },
       include: {
         subject: { select: { id: true, name: true, code: true } },
         questions: {
+          where: { groupId: null },
           orderBy: { sortOrder: 'asc' },
           include: {
             options: { orderBy: { sortOrder: 'asc' } },
+          },
+        },
+        questionGroups: {
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            questions: {
+              orderBy: { sortOrder: 'asc' },
+              include: {
+                options: { orderBy: { sortOrder: 'asc' } },
+              },
+            },
           },
         },
         _count: { select: { examSessions: true } },
@@ -274,7 +286,155 @@ export class ExamService {
     return { deleted: true };
   }
 
-  /** Import nhiều câu hỏi vào đề thi */
+  // ==================== ADMIN: QUESTION GROUP CRUD ====================
+
+  /** Thêm câu hỏi chùm */
+  async addQuestionGroup(examId: string, dto: {
+    title?: string;
+    content: string;
+    imageUrl?: string;
+    sortOrder?: number;
+    questions: Array<{
+      content: string;
+      explanation?: string;
+      type?: string;
+      options: Array<{ label: string; content: string; isCorrect: boolean }>;
+    }>;
+  }) {
+    await this.findOne(examId);
+
+    // Tính sortOrder tiếp theo (dùng chung sortOrder space với câu đơn)
+    const lastQ = await this.prisma.question.findFirst({
+      where: { examId },
+      orderBy: { sortOrder: 'desc' },
+    });
+    const lastG = await this.prisma.questionGroup.findFirst({
+      where: { examId },
+      orderBy: { sortOrder: 'desc' },
+    });
+    const maxOrder = Math.max(lastQ?.sortOrder ?? -1, lastG?.sortOrder ?? -1);
+    const groupSortOrder = dto.sortOrder ?? maxOrder + 1;
+
+    const group = await this.prisma.questionGroup.create({
+      data: {
+        examId,
+        title: dto.title,
+        content: dto.content,
+        imageUrl: dto.imageUrl,
+        sortOrder: groupSortOrder,
+        questions: {
+          create: dto.questions.map((q, idx) => ({
+            examId,
+            content: q.content,
+            explanation: q.explanation,
+            type: (q.type as any) || 'SINGLE_CHOICE',
+            sortOrder: idx,
+            options: {
+              create: q.options.map((opt, oidx) => ({
+                label: opt.label,
+                content: opt.content,
+                isCorrect: opt.isCorrect ?? false,
+                sortOrder: oidx,
+              })),
+            },
+          })),
+        },
+      },
+      include: {
+        questions: {
+          orderBy: { sortOrder: 'asc' },
+          include: { options: { orderBy: { sortOrder: 'asc' } } },
+        },
+      },
+    });
+
+    await this.syncTotalQuestions(examId);
+    return group;
+  }
+
+  /** Sửa câu hỏi chùm */
+  async updateQuestionGroup(examId: string, groupId: string, dto: {
+    title?: string;
+    content?: string;
+    imageUrl?: string;
+    questions?: Array<{
+      id?: string;
+      content: string;
+      explanation?: string;
+      type?: string;
+      options: Array<{ label: string; content: string; isCorrect: boolean }>;
+    }>;
+  }) {
+    const group = await this.prisma.questionGroup.findFirst({
+      where: { id: groupId, examId },
+    });
+    if (!group) throw new NotFoundException('Không tìm thấy nhóm câu hỏi');
+
+    // Cập nhật thông tin group
+    await this.prisma.questionGroup.update({
+      where: { id: groupId },
+      data: {
+        title: dto.title,
+        content: dto.content,
+        imageUrl: dto.imageUrl,
+      },
+    });
+
+    // Nếu có questions → xoá cũ + tạo lại
+    if (dto.questions) {
+      // Xoá tất cả câu hỏi con cũ
+      await this.prisma.question.deleteMany({ where: { groupId } });
+
+      // Tạo lại
+      for (let i = 0; i < dto.questions.length; i++) {
+        const q = dto.questions[i];
+        await this.prisma.question.create({
+          data: {
+            examId,
+            groupId,
+            content: q.content,
+            explanation: q.explanation,
+            type: (q.type as any) || 'SINGLE_CHOICE',
+            sortOrder: i,
+            options: {
+              create: q.options.map((opt, oidx) => ({
+                label: opt.label,
+                content: opt.content,
+                isCorrect: opt.isCorrect ?? false,
+                sortOrder: oidx,
+              })),
+            },
+          },
+        });
+      }
+    }
+
+    await this.syncTotalQuestions(examId);
+
+    return this.prisma.questionGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        questions: {
+          orderBy: { sortOrder: 'asc' },
+          include: { options: { orderBy: { sortOrder: 'asc' } } },
+        },
+      },
+    });
+  }
+
+  /** Xoá câu hỏi chùm */
+  async removeQuestionGroup(examId: string, groupId: string) {
+    const group = await this.prisma.questionGroup.findFirst({
+      where: { id: groupId, examId },
+    });
+    if (!group) throw new NotFoundException('Không tìm thấy nhóm câu hỏi');
+
+    await this.prisma.questionGroup.delete({ where: { id: groupId } });
+    await this.syncTotalQuestions(examId);
+    return { deleted: true };
+  }
+
+  /** Import nhiều câu hỏi vào đề thi (hỗ trợ câu đơn + câu chùm) */
   async bulkCreateQuestions(
     examId: string,
     questions: Array<{
@@ -282,6 +442,16 @@ export class ExamService {
       options: Array<{ label: string; content: string; isCorrect: boolean }>;
       explanation?: string;
       type?: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+    }>,
+    groups?: Array<{
+      title?: string;
+      content: string;
+      questions: Array<{
+        content: string;
+        options: Array<{ label: string; content: string; isCorrect: boolean }>;
+        explanation?: string;
+        type?: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+      }>;
     }>,
   ) {
     await this.findOne(examId);
@@ -291,7 +461,11 @@ export class ExamService {
       where: { examId },
       orderBy: { sortOrder: 'desc' },
     });
-    let currentOrder = (lastQuestion?.sortOrder ?? -1) + 1;
+    const lastGroup = await this.prisma.questionGroup.findFirst({
+      where: { examId },
+      orderBy: { sortOrder: 'desc' },
+    });
+    let currentOrder = Math.max(lastQuestion?.sortOrder ?? -1, lastGroup?.sortOrder ?? -1) + 1;
 
     const results = {
       success: 0,
@@ -299,6 +473,7 @@ export class ExamService {
       errors: [] as Array<{ row: number; message: string }>,
     };
 
+    // Import câu đơn
     for (let i = 0; i < questions.length; i++) {
       try {
         const q = questions[i];
@@ -324,15 +499,52 @@ export class ExamService {
         results.failed++;
         results.errors.push({
           row: i + 2,
-          message:
-            error instanceof Error ? error.message : 'Lỗi không xác định',
+          message: error instanceof Error ? error.message : 'Lỗi không xác định',
         });
       }
     }
 
-    // Cập nhật totalQuestions
-    await this.syncTotalQuestions(examId);
+    // Import câu chùm
+    if (groups && groups.length > 0) {
+      for (const g of groups) {
+        try {
+          await this.prisma.questionGroup.create({
+            data: {
+              examId,
+              title: g.title,
+              content: g.content,
+              sortOrder: currentOrder++,
+              questions: {
+                create: g.questions.map((q, idx) => ({
+                  examId,
+                  content: q.content,
+                  type: q.type || 'SINGLE_CHOICE',
+                  explanation: q.explanation,
+                  sortOrder: idx,
+                  options: {
+                    create: q.options.map((opt, oidx) => ({
+                      label: opt.label,
+                      content: opt.content,
+                      isCorrect: opt.isCorrect,
+                      sortOrder: oidx,
+                    })),
+                  },
+                })),
+              },
+            },
+          });
+          results.success += g.questions.length;
+        } catch (error) {
+          results.failed += g.questions.length;
+          results.errors.push({
+            row: 0,
+            message: `Nhóm "${g.title || 'không tên'}": ${error instanceof Error ? error.message : 'Lỗi'}`,
+          });
+        }
+      }
+    }
 
+    await this.syncTotalQuestions(examId);
     return results;
   }
 

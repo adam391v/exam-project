@@ -115,6 +115,34 @@ export class ExamController {
   }
 
   @UseGuards(AuthGuard('jwt'))
+  @Post('admin/exams/:examId/question-groups')
+  addQuestionGroup(
+    @Param('examId') examId: string,
+    @Body() dto: any,
+  ) {
+    return this.examService.addQuestionGroup(examId, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Put('admin/exams/:examId/question-groups/:groupId')
+  updateQuestionGroup(
+    @Param('examId') examId: string,
+    @Param('groupId') groupId: string,
+    @Body() dto: any,
+  ) {
+    return this.examService.updateQuestionGroup(examId, groupId, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Delete('admin/exams/:examId/question-groups/:groupId')
+  removeQuestionGroup(
+    @Param('examId') examId: string,
+    @Param('groupId') groupId: string,
+  ) {
+    return this.examService.removeQuestionGroup(examId, groupId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
   @Post('admin/exams/:examId/questions/import')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -145,7 +173,7 @@ export class ExamController {
 
     const parseResult = this.importService.parseExcel(file.buffer);
 
-    if (parseResult.questions.length === 0) {
+    if (parseResult.questions.length === 0 && parseResult.groups.length === 0) {
       return {
         success: true,
         data: {
@@ -160,6 +188,7 @@ export class ExamController {
     const importResult = await this.examService.bulkCreateQuestions(
       examId,
       parseResult.questions,
+      parseResult.groups,
     );
 
     const allErrors = [...parseResult.errors, ...importResult.errors];

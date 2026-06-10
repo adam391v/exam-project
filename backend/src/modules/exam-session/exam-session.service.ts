@@ -17,16 +17,25 @@ export class ExamSessionService {
       where: { id: dto.examId, status: 'PUBLISHED', isPublic: true },
       include: {
         questions: {
+          where: { groupId: null },
           orderBy: { sortOrder: 'asc' },
           include: {
             options: {
               orderBy: { sortOrder: 'asc' },
-              select: {
-                id: true,
-                label: true,
-                content: true,
-                sortOrder: true,
-                // KHÔNG trả isCorrect
+              select: { id: true, label: true, content: true, sortOrder: true },
+            },
+          },
+        },
+        questionGroups: {
+          orderBy: { sortOrder: 'asc' },
+          include: {
+            questions: {
+              orderBy: { sortOrder: 'asc' },
+              include: {
+                options: {
+                  orderBy: { sortOrder: 'asc' },
+                  select: { id: true, label: true, content: true, sortOrder: true },
+                },
               },
             },
           },
@@ -57,6 +66,9 @@ export class ExamSessionService {
       throw new NotFoundException('Vui lòng chọn lớp hoặc nhập tên lớp');
     }
 
+    // Flatten questions: câu đơn + câu con từ groups
+    const flatQuestions = this.flattenQuestions(exam.questions, exam.questionGroups);
+
     // Tạo phiên thi
     const session = await this.prisma.examSession.create({
       data: {
@@ -70,7 +82,7 @@ export class ExamSessionService {
     });
 
     // Tạo sẵn các ExamAnswer records (chưa chọn đáp án)
-    const answerRecords = exam.questions.map((q) => ({
+    const answerRecords = flatQuestions.map((q) => ({
       sessionId: session.id,
       questionId: q.id,
     }));
@@ -80,14 +92,7 @@ export class ExamSessionService {
     });
 
     // Trả về thông tin cần thiết (KHÔNG có đáp án đúng)
-    let questions = exam.questions.map((q) => ({
-      id: q.id,
-      content: q.content,
-      imageUrl: q.imageUrl,
-      latex: q.latex,
-      type: q.type,
-      options: q.options,
-    }));
+    let questions = flatQuestions;
 
     // Shuffle câu hỏi nếu cần
     if (exam.shuffleQuestions) {
@@ -108,12 +113,12 @@ export class ExamSessionService {
         id: exam.id,
         title: exam.title,
         duration: exam.duration,
-        totalQuestions: exam.totalQuestions,
+        totalQuestions: flatQuestions.length,
         subject: exam.subject,
       },
       student: {
         name: dto.studentName,
-        class: dto.studentClass,
+        class: studentClass,
       },
       questions,
       startedAt: session.startedAt,
@@ -257,6 +262,7 @@ export class ExamSessionService {
           include: {
             subject: { select: { id: true, name: true, code: true } },
             questions: {
+              where: { groupId: null },
               orderBy: { sortOrder: 'asc' },
               select: {
                 id: true,
@@ -266,11 +272,25 @@ export class ExamSessionService {
                 type: true,
                 options: {
                   orderBy: { sortOrder: 'asc' },
+                  select: { id: true, label: true, content: true, sortOrder: true },
+                },
+              },
+            },
+            questionGroups: {
+              orderBy: { sortOrder: 'asc' },
+              include: {
+                questions: {
+                  orderBy: { sortOrder: 'asc' },
                   select: {
                     id: true,
-                    label: true,
                     content: true,
-                    sortOrder: true,
+                    imageUrl: true,
+                    latex: true,
+                    type: true,
+                    options: {
+                      orderBy: { sortOrder: 'asc' },
+                      select: { id: true, label: true, content: true, sortOrder: true },
+                    },
                   },
                 },
               },
@@ -292,6 +312,12 @@ export class ExamSessionService {
     if (!session) {
       throw new NotFoundException('Không tìm thấy phiên thi');
     }
+
+    // Flatten questions
+    const flatQuestions = this.flattenQuestions(
+      session.exam.questions as any[],
+      session.exam.questionGroups as any[],
+    );
 
     // Kiểm tra hết giờ
     const elapsedSeconds = Math.floor(
@@ -317,14 +343,14 @@ export class ExamSessionService {
         id: session.exam.id,
         title: session.exam.title,
         duration: session.exam.duration,
-        totalQuestions: session.exam.totalQuestions,
+        totalQuestions: flatQuestions.length,
         subject: session.exam.subject,
       },
       student: {
         name: session.studentName,
         class: session.studentClass,
       },
-      questions: session.exam.questions,
+      questions: flatQuestions,
       answers: session.answers,
       startedAt: session.startedAt,
       remainingSeconds,
@@ -358,6 +384,55 @@ export class ExamSessionService {
     }
 
     return session;
+  }
+
+  /** Flatten câu đơn + câu chùm thành mảng phẳng */
+  private flattenQuestions(standaloneQuestions: any[], questionGroups: any[]) {
+    const result: any[] = [];
+
+    // Merge câu đơn và groups theo sortOrder
+    const items: Array<{ type: 'single'; sortOrder: number; data: any } | { type: 'group'; sortOrder: number; data: any }> = [];
+
+    for (const q of standaloneQuestions) {
+      items.push({ type: 'single', sortOrder: q.sortOrder ?? 0, data: q });
+    }
+    for (const g of questionGroups) {
+      items.push({ type: 'group', sortOrder: g.sortOrder ?? 0, data: g });
+    }
+
+    // Sắp xếp theo sortOrder
+    items.sort((a, b) => a.sortOrder - b.sortOrder);
+
+    for (const item of items) {
+      if (item.type === 'single') {
+        result.push({
+          id: item.data.id,
+          content: item.data.content,
+          imageUrl: item.data.imageUrl,
+          latex: item.data.latex,
+          type: item.data.type,
+          options: item.data.options,
+        });
+      } else {
+        // Group: flatten các câu con, gắn groupContent
+        for (const q of item.data.questions) {
+          result.push({
+            id: q.id,
+            content: q.content,
+            imageUrl: q.imageUrl,
+            latex: q.latex,
+            type: q.type,
+            options: q.options,
+            groupId: item.data.id,
+            groupContent: item.data.content,
+            groupImageUrl: item.data.imageUrl,
+            groupTitle: item.data.title,
+          });
+        }
+      }
+    }
+
+    return result;
   }
 
   /** Fisher-Yates shuffle */

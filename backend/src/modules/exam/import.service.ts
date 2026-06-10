@@ -8,16 +8,32 @@ export interface ParsedQuestion {
   type: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
 }
 
+export interface ParsedGroup {
+  title?: string;
+  content: string;
+  questions: ParsedQuestion[];
+}
+
 export interface ImportResult {
   questions: ParsedQuestion[];
+  groups: ParsedGroup[];
   errors: Array<{ row: number; message: string }>;
 }
 
 @Injectable()
 export class ImportService {
   /**
-   * Parse file Excel thành mảng câu hỏi
-   * Cấu trúc file: Câu hỏi | A | B | C | D | Đáp án đúng | Giải thích
+   * Parse file Excel thành mảng câu hỏi + câu chùm
+   *
+   * Format câu đơn (cũ):
+   * | Câu hỏi | A | B | C | D | Đáp án đúng | Giải thích |
+   *
+   * Format mới (hỗ trợ câu chùm):
+   * | Loại | Nội dung chung | Câu hỏi | A | B | C | D | Đáp án đúng | Giải thích |
+   *
+   * - Cột "Loại" = "CHÙM" → bắt đầu group mới, "Nội dung chung" là nội dung chung
+   * - Hàng tiếp theo (Loại trống) → câu hỏi con trong group
+   * - Nếu file chỉ có 7 cột → legacy format (câu đơn only)
    */
   parseExcel(buffer: Buffer): ImportResult {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
@@ -36,18 +52,30 @@ export class ImportService {
       );
     }
 
+    // Detect format: nếu header có "Loại" hoặc >= 9 cột → format mới
+    const header = rows[0] as string[];
+    const isNewFormat = header.length >= 9 ||
+      header.some((h: string) => typeof h === 'string' && h.toLowerCase().includes('loại'));
+
+    if (isNewFormat) {
+      return this.parseNewFormat(rows);
+    } else {
+      return this.parseLegacyFormat(rows);
+    }
+  }
+
+  /** Format cũ: Câu hỏi | A | B | C | D | Đáp án | Giải thích */
+  private parseLegacyFormat(rows: any[]): ImportResult {
     const questions: ParsedQuestion[] = [];
     const errors: Array<{ row: number; message: string }> = [];
 
-    // Bỏ qua header (hàng 1), bắt đầu từ hàng 2
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       const rowNum = i + 1;
-
       if (!row || row.length === 0 || !row[0]) continue;
 
       try {
-        const question = this.parseRow(row, rowNum);
+        const question = this.parseQuestionRow(row, rowNum, 0);
         questions.push(question);
       } catch (error) {
         errors.push({
@@ -57,17 +85,119 @@ export class ImportService {
       }
     }
 
-    return { questions, errors };
+    return { questions, groups: [], errors };
   }
 
-  private parseRow(row: any[], rowNum: number): ParsedQuestion {
-    const content = String(row[0] || '').trim();
-    const optA = String(row[1] || '').trim();
-    const optB = String(row[2] || '').trim();
-    const optC = String(row[3] || '').trim();
-    const optD = String(row[4] || '').trim();
-    const correctAnswer = String(row[5] || '').trim().toUpperCase();
-    const explanation = row[6] ? String(row[6]).trim() : undefined;
+  /** Format mới: Loại | Nội dung chung | Câu hỏi | A | B | C | D | Đáp án | Giải thích */
+  private parseNewFormat(rows: any[]): ImportResult {
+    const questions: ParsedQuestion[] = [];
+    const groups: ParsedGroup[] = [];
+    const errors: Array<{ row: number; message: string }> = [];
+
+    let currentGroup: ParsedGroup | null = null;
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 1;
+      if (!row || row.length === 0) continue;
+
+      const loai = String(row[0] || '').trim().toUpperCase();
+      const noiDungChung = String(row[1] || '').trim();
+
+      if (loai === 'CHÙM' || loai === 'CHUM' || loai === 'GROUP') {
+        // Bắt đầu group mới
+        if (currentGroup && currentGroup.questions.length > 0) {
+          groups.push(currentGroup);
+        }
+        if (!noiDungChung) {
+          errors.push({ row: rowNum, message: 'Nội dung chung không được để trống' });
+          currentGroup = null;
+          continue;
+        }
+        currentGroup = {
+          title: noiDungChung.substring(0, 100),
+          content: noiDungChung,
+          questions: [],
+        };
+        continue;
+      }
+
+      // Nếu đang trong group context → câu hỏi con
+      if (currentGroup) {
+        const cauHoi = String(row[2] || '').trim();
+        if (!cauHoi) {
+          // Kết thúc group nếu hàng trống
+          if (currentGroup.questions.length > 0) {
+            groups.push(currentGroup);
+          }
+          currentGroup = null;
+          continue;
+        }
+
+        try {
+          const question = this.parseQuestionRow(row, rowNum, 2);
+          currentGroup.questions.push(question);
+        } catch (error) {
+          errors.push({
+            row: rowNum,
+            message: error instanceof Error ? error.message : 'Lỗi không xác định',
+          });
+        }
+        continue;
+      }
+
+      // Câu đơn (Loại trống, không có group context)
+      // Kiểm tra: nếu cột 2 (Câu hỏi) có giá trị → dùng cột 2
+      // Nếu không → thử cột 0 (backward compat)
+      const cauHoiCol2 = String(row[2] || '').trim();
+      if (cauHoiCol2) {
+        try {
+          const question = this.parseQuestionRow(row, rowNum, 2);
+          questions.push(question);
+        } catch (error) {
+          errors.push({
+            row: rowNum,
+            message: error instanceof Error ? error.message : 'Lỗi không xác định',
+          });
+        }
+      } else {
+        // Cột 0 có thể là câu hỏi đơn (legacy row trong file mới)
+        const cauHoiCol0 = String(row[0] || '').trim();
+        if (cauHoiCol0) {
+          try {
+            const question = this.parseQuestionRow(row, rowNum, 0);
+            questions.push(question);
+          } catch (error) {
+            errors.push({
+              row: rowNum,
+              message: error instanceof Error ? error.message : 'Lỗi không xác định',
+            });
+          }
+        }
+      }
+    }
+
+    // Push group cuối nếu còn
+    if (currentGroup && currentGroup.questions.length > 0) {
+      groups.push(currentGroup);
+    }
+
+    return { questions, groups, errors };
+  }
+
+  /**
+   * Parse 1 hàng câu hỏi bắt đầu từ cột offset
+   * offset=0: | Câu hỏi | A | B | C | D | Đáp án | Giải thích |
+   * offset=2: | ... | ... | Câu hỏi | A | B | C | D | Đáp án | Giải thích |
+   */
+  private parseQuestionRow(row: any[], rowNum: number, offset: number): ParsedQuestion {
+    const content = String(row[offset] || '').trim();
+    const optA = String(row[offset + 1] || '').trim();
+    const optB = String(row[offset + 2] || '').trim();
+    const optC = String(row[offset + 3] || '').trim();
+    const optD = String(row[offset + 4] || '').trim();
+    const correctAnswer = String(row[offset + 5] || '').trim().toUpperCase();
+    const explanation = row[offset + 6] ? String(row[offset + 6]).trim() : undefined;
 
     if (!content) {
       throw new Error(`Hàng ${rowNum}: Nội dung câu hỏi không được để trống`);
@@ -92,8 +222,7 @@ export class ImportService {
       );
     }
 
-    const type =
-      correctLabels.length > 1 ? 'MULTIPLE_CHOICE' : 'SINGLE_CHOICE';
+    const type = correctLabels.length > 1 ? 'MULTIPLE_CHOICE' : 'SINGLE_CHOICE';
 
     const allOptions = [
       { label: 'A', content: optA },
