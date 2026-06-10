@@ -1,15 +1,23 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { examService, examSessionService } from '../../services/data.service';
+import { examService, examSessionService, classroomService } from '../../services/data.service';
 import { toast } from 'sonner';
 import { Clock, FileText, BookOpen, ArrowLeft, User, GraduationCap } from 'lucide-react';
+import AppSelect from '../../components/AppSelect';
+
+// Options khối 1-12
+const gradeOptions = Array.from({ length: 12 }, (_, i) => ({
+  value: String(i + 1),
+  label: `Khối ${i + 1}`,
+}));
 
 export default function ExamDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [studentName, setStudentName] = useState('');
-  const [studentClass, setStudentClass] = useState('');
+  const [selectedGrade, setSelectedGrade] = useState<number | null>(null);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(false);
 
   const { data: exam, isLoading } = useQuery({
@@ -18,19 +26,37 @@ export default function ExamDetailPage() {
     enabled: !!id,
   });
 
+  // Lấy danh sách lớp theo khối
+  const { data: classrooms = [], isLoading: isLoadingClassrooms } = useQuery({
+    queryKey: ['classrooms-by-grade', selectedGrade],
+    queryFn: () => classroomService.getByGrade(selectedGrade!),
+    enabled: !!selectedGrade,
+  });
+
+  const classroomOptions = useMemo(() =>
+    Array.isArray(classrooms) ? classrooms.map((c: any) => ({ value: c.id, label: c.name })) : [],
+    [classrooms],
+  );
+
+  const selectedClassroom = classroomOptions.find((o: any) => o.value === selectedClassroomId) || null;
+
   const handleStartExam = async () => {
     if (!studentName.trim()) {
       toast.error('Vui lòng nhập họ và tên');
       return;
     }
-    if (!studentClass.trim()) {
-      toast.error('Vui lòng nhập lớp');
+    if (!selectedClassroomId) {
+      toast.error('Vui lòng chọn lớp');
       return;
     }
 
+    // Lookup tên lớp
+    const classroom = classrooms.find((c: any) => c.id === selectedClassroomId);
+    const studentClass = classroom?.name || '';
+
     setIsStarting(true);
     try {
-      const session = await examSessionService.start(id!, studentName.trim(), studentClass.trim());
+      const session = await examSessionService.start(id!, studentName.trim(), studentClass, selectedClassroomId);
       navigate(`/take-exam/${session.sessionId}`, {
         state: session,
       });
@@ -133,29 +159,48 @@ export default function ExamDetailPage() {
                 value={studentName}
                 onChange={(e) => setStudentName(e.target.value)}
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                onKeyDown={(e) => e.key === 'Enter' && document.getElementById('class-input')?.focus()}
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                <GraduationCap className="w-4 h-4 inline mr-1.5 text-slate-400" />
-                Lớp
-              </label>
-              <input
-                id="class-input"
-                type="text"
-                placeholder="VD: 12A1"
-                value={studentClass}
-                onChange={(e) => setStudentClass(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                onKeyDown={(e) => e.key === 'Enter' && handleStartExam()}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <GraduationCap className="w-4 h-4 inline mr-1.5 text-slate-400" />
+                  Khối
+                </label>
+                <AppSelect
+                  value={selectedGrade ? gradeOptions.find(o => o.value === String(selectedGrade)) || null : null}
+                  onChange={(opt) => {
+                    const grade = opt ? Number(opt.value) : null;
+                    setSelectedGrade(grade);
+                    setSelectedClassroomId(null); // Reset lớp khi đổi khối
+                  }}
+                  options={gradeOptions}
+                  placeholder="Chọn khối..."
+                  isSearchable={false}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <GraduationCap className="w-4 h-4 inline mr-1.5 text-slate-400" />
+                  Lớp
+                </label>
+                <AppSelect
+                  value={selectedClassroom}
+                  onChange={(opt) => setSelectedClassroomId(opt?.value || null)}
+                  options={classroomOptions}
+                  placeholder={selectedGrade ? (isLoadingClassrooms ? 'Đang tải...' : 'Chọn lớp...') : 'Chọn khối trước'}
+                  isDisabled={!selectedGrade || isLoadingClassrooms}
+                  isLoading={isLoadingClassrooms}
+                  noOptionsMessage={() => 'Không có lớp nào trong khối này'}
+                />
+              </div>
             </div>
 
             <button
               onClick={handleStartExam}
-              disabled={isStarting || !studentName.trim() || !studentClass.trim()}
+              disabled={isStarting || !studentName.trim() || !selectedClassroomId}
               className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-3.5 rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
             >
               {isStarting ? (

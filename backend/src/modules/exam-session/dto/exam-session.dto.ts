@@ -9,9 +9,13 @@ export class StartExamDto {
   @IsString()
   studentName: string;
 
-  @IsNotEmpty({ message: 'Lớp không được để trống' })
+  @IsOptional()
   @IsString()
-  studentClass: string;
+  studentClass?: string;
+
+  @IsOptional()
+  @IsString()
+  classroomId?: string;
 }
 
 export class SaveAnswerDto {

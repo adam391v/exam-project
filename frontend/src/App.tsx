@@ -22,6 +22,7 @@ import ExamsPage from './pages/admin/ExamsPage';
 import ExamDetailAdminPage from './pages/admin/ExamDetailAdminPage';
 import ResultsPage from './pages/admin/ResultsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
+import ClassroomsPage from './pages/admin/ClassroomsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,6 +76,7 @@ function App() {
             <Route index element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="subjects" element={<SubjectsPage />} />
+            <Route path="classrooms" element={<ClassroomsPage />} />
             <Route path="exams" element={<ExamsPage />} />
             <Route path="exams/:id" element={<ExamDetailAdminPage />} />
             <Route path="results" element={<ResultsPage />} />

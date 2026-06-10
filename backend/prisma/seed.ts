@@ -347,7 +347,28 @@ async function main() {
   });
   console.log(`✅ Đề thi Vật Lý: ${physicsExam.title}`);
 
-  // 5. System configs
+  // 5. Tạo lớp học mẫu
+  const classroomData = [
+    { name: '10A1', grade: 10, sortOrder: 1 },
+    { name: '10A2', grade: 10, sortOrder: 2 },
+    { name: '10A3', grade: 10, sortOrder: 3 },
+    { name: '11A1', grade: 11, sortOrder: 1 },
+    { name: '11A2', grade: 11, sortOrder: 2 },
+    { name: '12A1', grade: 12, sortOrder: 1 },
+    { name: '12A2', grade: 12, sortOrder: 2 },
+    { name: '12A3', grade: 12, sortOrder: 3 },
+  ];
+
+  for (const c of classroomData) {
+    await prisma.classroom.upsert({
+      where: { name_grade: { name: c.name, grade: c.grade } },
+      update: {},
+      create: c,
+    });
+  }
+  console.log(`✅ Lớp học: ${classroomData.length} lớp`);
+
+  // 6. System configs
   await prisma.systemConfig.upsert({
     where: { key: 'APP_NAME' },
     update: {},

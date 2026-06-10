@@ -10,12 +10,14 @@ import {
   Menu,
   X,
   ChevronRight,
+  School,
 } from 'lucide-react';
 import { useState } from 'react';
 
 const menuItems = [
   { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/admin/subjects', label: 'Môn học', icon: BookOpen },
+  { path: '/admin/classrooms', label: 'Lớp học', icon: School },
   { path: '/admin/exams', label: 'Đề thi', icon: FileText },
   { path: '/admin/results', label: 'Kết quả', icon: ClipboardList },
   { path: '/admin/users', label: 'Quản trị viên', icon: Users },

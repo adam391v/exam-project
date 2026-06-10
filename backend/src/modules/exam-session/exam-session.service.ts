@@ -39,12 +39,31 @@ export class ExamSessionService {
       throw new NotFoundException('Đề thi không tồn tại hoặc chưa được công khai');
     }
 
+    // Xác định studentClass
+    let studentClass = dto.studentClass || '';
+    let classroomId: string | null = null;
+
+    if (dto.classroomId) {
+      const classroom = await this.prisma.classroom.findUnique({
+        where: { id: dto.classroomId },
+      });
+      if (classroom) {
+        studentClass = classroom.name;
+        classroomId = classroom.id;
+      }
+    }
+
+    if (!studentClass) {
+      throw new NotFoundException('Vui lòng chọn lớp hoặc nhập tên lớp');
+    }
+
     // Tạo phiên thi
     const session = await this.prisma.examSession.create({
       data: {
         examId: dto.examId,
         studentName: dto.studentName,
-        studentClass: dto.studentClass,
+        studentClass,
+        classroomId,
         ipAddress,
         userAgent,
       },

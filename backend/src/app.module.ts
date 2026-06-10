@@ -9,6 +9,7 @@ import { ExamModule } from './modules/exam/exam.module';
 import { ExamSessionModule } from './modules/exam-session/exam-session.module';
 import { ResultModule } from './modules/result/result.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { ClassroomModule } from './modules/classroom/classroom.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
     ExamSessionModule,
     ResultModule,
     DashboardModule,
+    ClassroomModule,
   ],
 })
 export class AppModule {}

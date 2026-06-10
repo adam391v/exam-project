@@ -26,8 +26,8 @@ export const examService = {
 };
 
 export const examSessionService = {
-  start: async (examId: string, studentName: string, studentClass: string): Promise<ExamSessionStart> => {
-    const { data } = await api.post('/exam-sessions/start', { examId, studentName, studentClass });
+  start: async (examId: string, studentName: string, studentClass: string, classroomId?: string): Promise<ExamSessionStart> => {
+    const { data } = await api.post('/exam-sessions/start', { examId, studentName, studentClass, classroomId });
     return data.data;
   },
 
@@ -167,6 +167,38 @@ export const adminUserService = {
   },
   delete: async (id: string) => {
     const { data } = await api.delete(`/admin/users/${id}`);
+    return data.data;
+  },
+};
+
+// ===== CLASSROOM SERVICES =====
+
+export const classroomService = {
+  getGrades: async (): Promise<{ grade: number; count: number }[]> => {
+    const { data } = await api.get('/classrooms/grades');
+    return data.data;
+  },
+  getByGrade: async (grade: number) => {
+    const { data } = await api.get('/classrooms', { params: { grade } });
+    return data.data;
+  },
+};
+
+export const adminClassroomService = {
+  getAll: async (params?: Record<string, string | number | undefined>): Promise<PaginatedResponse<any>> => {
+    const { data } = await api.get('/admin/classrooms', { params });
+    return data.data;
+  },
+  create: async (dto: { name: string; grade: number; sortOrder?: number }) => {
+    const { data } = await api.post('/admin/classrooms', dto);
+    return data.data;
+  },
+  update: async (id: string, dto: { name?: string; grade?: number; isActive?: boolean; sortOrder?: number }) => {
+    const { data } = await api.put(`/admin/classrooms/${id}`, dto);
+    return data.data;
+  },
+  delete: async (id: string) => {
+    const { data } = await api.delete(`/admin/classrooms/${id}`);
     return data.data;
   },
 };

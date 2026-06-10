@@ -119,6 +119,23 @@ model QuestionOption {
   @@map("question_options")
 }
 
+// ==================== CLASSROOMS ====================
+
+model Classroom {
+  id        String   @id @default(uuid())
+  name      String                          // VD: "12A1", "10B2"
+  grade     Int                             // Khối: 1-12
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  examSessions ExamSession[]
+
+  @@unique([name, grade])
+  @@map("classrooms")
+}
+
 // ==================== EXAM SESSION ====================
 
 enum SessionStatus {
@@ -132,6 +149,7 @@ model ExamSession {
   examId       String        @map("exam_id")
   studentName  String        @map("student_name")
   studentClass String        @map("student_class")
+  classroomId  String?       @map("classroom_id")
   startedAt    DateTime      @default(now()) @map("started_at")
   submittedAt  DateTime?     @map("submitted_at")
   status       SessionStatus @default(IN_PROGRESS)
@@ -139,9 +157,10 @@ model ExamSession {
   userAgent    String?       @map("user_agent")
   createdAt    DateTime      @default(now()) @map("created_at")
 
-  exam    Exam         @relation(fields: [examId], references: [id])
-  answers ExamAnswer[]
-  result  ExamResult?
+  exam      Exam         @relation(fields: [examId], references: [id])
+  classroom Classroom?   @relation(fields: [classroomId], references: [id])
+  answers   ExamAnswer[]
+  result    ExamResult?
 
   @@map("exam_sessions")
 }
