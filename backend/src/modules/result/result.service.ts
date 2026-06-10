@@ -87,66 +87,110 @@ export class ResultService {
     return response;
   }
 
-  /** Admin: Danh sách kết quả có phân trang + filter */
-  async findAll(query: {
+  /** Admin: Kết quả nhóm theo lớp + đề thi */
+  async findGroupedByClass(query: {
     page?: number;
     limit?: number;
-    subjectId?: string;
-    examId?: string;
     search?: string;
-    fromDate?: string;
-    toDate?: string;
   }) {
-    const {
-      page = 1,
-      limit = 10,
-      subjectId,
-      examId,
-      search,
-      fromDate,
-      toDate,
-    } = query;
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 20;
+    const { search } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {
       result: { isNot: null },
     };
-
-    if (examId) where.examId = examId;
-    if (subjectId) where.exam = { subjectId };
     if (search) {
       where.OR = [
-        { studentName: { contains: search, mode: 'insensitive' } },
         { studentClass: { contains: search, mode: 'insensitive' } },
+        { exam: { title: { contains: search, mode: 'insensitive' } } },
+        { exam: { subject: { name: { contains: search, mode: 'insensitive' } } } },
       ];
     }
-    if (fromDate || toDate) {
-      where.submittedAt = {};
-      if (fromDate) where.submittedAt.gte = new Date(fromDate);
-      if (toDate) where.submittedAt.lte = new Date(toDate);
+
+    // Lấy tất cả sessions đã có result, group trong JS
+    const allSessions = await this.prisma.examSession.findMany({
+      where,
+      orderBy: { submittedAt: 'desc' },
+      select: {
+        id: true,
+        studentClass: true,
+        examId: true,
+        submittedAt: true,
+        exam: {
+          select: {
+            id: true,
+            title: true,
+            subject: { select: { id: true, name: true } },
+          },
+        },
+        result: {
+          select: { score: true, correctAnswers: true, totalQuestions: true },
+        },
+      },
+    });
+
+    // Group theo studentClass + examId
+    const groupMap = new Map<string, any>();
+    for (const s of allSessions) {
+      const key = `${s.studentClass}___${s.examId}`;
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          studentClass: s.studentClass,
+          examId: s.examId,
+          examTitle: s.exam.title,
+          subjectName: s.exam.subject?.name || '',
+          studentCount: 0,
+          avgScore: 0,
+          totalScore: 0,
+          latestDate: s.submittedAt,
+        });
+      }
+      const group = groupMap.get(key)!;
+      group.studentCount++;
+      group.totalScore += s.result?.score || 0;
+      if (s.submittedAt && (!group.latestDate || s.submittedAt > group.latestDate)) {
+        group.latestDate = s.submittedAt;
+      }
     }
 
-    const [data, total] = await Promise.all([
-      this.prisma.examSession.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { submittedAt: 'desc' },
-        include: {
-          exam: {
-            select: {
-              id: true,
-              title: true,
-              subject: { select: { id: true, name: true } },
-            },
-          },
-          result: true,
-        },
-      }),
-      this.prisma.examSession.count({ where }),
-    ]);
+    const allGroups = Array.from(groupMap.values()).map(g => ({
+      ...g,
+      avgScore: g.studentCount > 0 ? Math.round((g.totalScore / g.studentCount) * 10) / 10 : 0,
+    }));
+    // Sắp xếp theo ngày thi mới nhất
+    allGroups.sort((a, b) => new Date(b.latestDate).getTime() - new Date(a.latestDate).getTime());
+
+    const total = allGroups.length;
+    const data = allGroups.slice(skip, skip + limit);
 
     return new PaginatedResult(data, total, page, limit);
+  }
+
+  /** Admin: Chi tiết kết quả 1 lớp + 1 đề thi */
+  async findByClassAndExam(studentClass: string, examId: string) {
+    const sessions = await this.prisma.examSession.findMany({
+      where: {
+        studentClass,
+        examId,
+        result: { isNot: null },
+      },
+      orderBy: { submittedAt: 'desc' },
+      include: {
+        exam: {
+          select: {
+            id: true,
+            title: true,
+            duration: true,
+            subject: { select: { id: true, name: true } },
+          },
+        },
+        result: true,
+      },
+    });
+
+    return sessions;
   }
 
   /** Admin: Xem chi tiết bài làm */

@@ -131,6 +131,10 @@ export const adminResultService = {
     const { data } = await api.get('/admin/results', { params });
     return data.data;
   },
+  getClassDetail: async (studentClass: string, examId: string) => {
+    const { data } = await api.get('/admin/results/class-detail', { params: { studentClass, examId } });
+    return data.data;
+  },
   getDetail: async (id: string) => {
     const { data } = await api.get(`/admin/results/${id}`);
     return data.data;

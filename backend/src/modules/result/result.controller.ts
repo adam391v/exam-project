@@ -24,24 +24,25 @@ export class ResultController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get('admin/results')
-  findAll(
+  findGrouped(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
-    @Query('subjectId') subjectId?: string,
-    @Query('examId') examId?: string,
     @Query('search') search?: string,
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
   ) {
-    return this.resultService.findAll({
+    return this.resultService.findGroupedByClass({
       page: page ? parseInt(page) : 1,
-      limit: limit ? parseInt(limit) : 10,
-      subjectId,
-      examId,
+      limit: limit ? parseInt(limit) : 20,
       search,
-      fromDate,
-      toDate,
     });
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('admin/results/class-detail')
+  findByClassAndExam(
+    @Query('studentClass') studentClass: string,
+    @Query('examId') examId: string,
+  ) {
+    return this.resultService.findByClassAndExam(studentClass, examId);
   }
 
   @UseGuards(AuthGuard('jwt'))
