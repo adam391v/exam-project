@@ -14,6 +14,9 @@ import {
   X,
   Check,
   Layers,
+  Shield,
+  EyeOff,
+  Maximize,
 } from 'lucide-react';
 import type { ExamSessionStart, ExamAnswer } from '../../types/api.types';
 
@@ -115,14 +118,6 @@ function isItemFullyAnswered(item: ExamItem, answers: Map<string, ExamAnswer>): 
   return ids.every((id) => answers.get(id)?.selectedOptionId);
 }
 
-/** Kiểm tra item đã trả lời 1 phần (chỉ áp dụng group) */
-function isItemPartiallyAnswered(item: ExamItem, answers: Map<string, ExamAnswer>): boolean {
-  if (item.type === 'single') return false;
-  const ids = getItemQuestionIds(item);
-  const answeredCount = ids.filter((id) => answers.get(id)?.selectedOptionId).length;
-  return answeredCount > 0 && answeredCount < ids.length;
-}
-
 /** Kiểm tra item đã được đánh dấu chưa */
 function isItemMarked(item: ExamItem, answers: Map<string, ExamAnswer>): boolean {
   const ids = getItemQuestionIds(item);
@@ -153,6 +148,13 @@ export default function TakeExamPage() {
   const [isTimeUp, setIsTimeUp] = useState(false);
   const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const autoSubmitRef = useRef(false); // Tránh submit trùng lặp
+
+  // Anti-cheat states
+  const MAX_VIOLATIONS = 5; // Số lần rời tab tối đa trước khi tự nộp bài
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [showViolationWarning, setShowViolationWarning] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const violationProcessingRef = useRef(false);
 
   // Khôi phục session khi refresh
   useEffect(() => {
@@ -243,6 +245,89 @@ export default function TakeExamPage() {
       if (autoSaveRef.current) clearInterval(autoSaveRef.current);
     };
   }, []);
+
+  // ===== ANTI-CHEAT: Fullscreen =====
+  const enterFullscreen = useCallback(async () => {
+    try {
+      await document.documentElement.requestFullscreen();
+      setIsFullscreen(true);
+    } catch {
+      // Trình duyệt không hỗ trợ hoặc user chặn
+    }
+  }, []);
+
+  // Bắt fullscreen khi có examData
+  useEffect(() => {
+    if (!examData || isTimeUp) return;
+    enterFullscreen();
+  }, [examData, isTimeUp, enterFullscreen]);
+
+  // Theo dõi fullscreenchange
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isFull = !!document.fullscreenElement;
+      setIsFullscreen(isFull);
+
+      // Thoát fullscreen = vi phạm
+      if (!isFull && examData && !isTimeUp && sessionId) {
+        handleViolation();
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [examData, isTimeUp, sessionId]);
+
+  // ===== ANTI-CHEAT: Visibility change (chuyển tab) =====
+  const handleViolation = useCallback(async () => {
+    if (!sessionId || isTimeUp || violationProcessingRef.current) return;
+    violationProcessingRef.current = true;
+
+    try {
+      const result = await examSessionService.reportViolation(sessionId);
+      const count = result.tabSwitchCount;
+      setTabSwitchCount(count);
+
+      if (count >= MAX_VIOLATIONS) {
+        // Vượt quá giới hạn → tự động nộp bài
+        toast.error(`Bạn đã rời khỏi bài thi ${count} lần. Bài thi tự động nộp!`);
+        try {
+          await examSessionService.submit(sessionId);
+        } catch { /* ignore */ }
+        navigate(`/results/${sessionId}`);
+      } else {
+        // Hiện cảnh báo
+        setShowViolationWarning(true);
+        toast.warning(`⚠️ Cảnh báo: Rời bài thi lần ${count}/${MAX_VIOLATIONS}. Vượt quá sẽ tự động nộp bài!`);
+      }
+    } catch { /* ignore */ }
+    finally {
+      violationProcessingRef.current = false;
+    }
+  }, [sessionId, isTimeUp, navigate]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && examData && !isTimeUp) {
+        handleViolation();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [examData, isTimeUp, handleViolation]);
+
+  // ===== ANTI-CHEAT: Chặn Ctrl+Tab, Alt+Tab cảnh báo =====
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (examData && !isTimeUp) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [examData, isTimeUp]);
 
   // Chọn đáp án
   const handleSelectAnswer = useCallback(
@@ -397,7 +482,26 @@ export default function TakeExamPage() {
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            {/* Vi phạm badge */}
+            {tabSwitchCount > 0 && (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 border border-red-200" title={`Rời bài thi ${tabSwitchCount}/${MAX_VIOLATIONS} lần`}>
+                <EyeOff className="w-3.5 h-3.5 text-red-500" />
+                <span className="text-xs font-bold text-red-600">{tabSwitchCount}/{MAX_VIOLATIONS}</span>
+              </div>
+            )}
+            {/* Nút fullscreen */}
+            {!isFullscreen && (
+              <button
+                onClick={enterFullscreen}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all"
+                title="Vào chế độ toàn màn hình"
+              >
+                <Maximize className="w-3.5 h-3.5" />
+                Toàn màn hình
+              </button>
+            )}
+            {/* Timer */}
             <div
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg font-mono text-sm font-bold ${
                 isWarningTime
@@ -625,6 +729,46 @@ export default function TakeExamPage() {
                   Xác nhận nộp bài
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Violation Warning Modal */}
+      {showViolationWarning && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
+            <div className="p-6 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full flex items-center justify-center">
+                <Shield className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">⚠️ Cảnh báo gian lận</h3>
+              <p className="text-sm text-slate-600 mb-4">
+                Bạn đã rời khỏi bài thi. Hành vi này được ghi nhận là vi phạm.
+              </p>
+
+              <div className="bg-red-50 rounded-xl p-4 mb-5 border border-red-200">
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <EyeOff className="w-5 h-5 text-red-500" />
+                  <span className="text-2xl font-bold text-red-600">{tabSwitchCount} / {MAX_VIOLATIONS}</span>
+                </div>
+                <p className="text-xs text-red-500">
+                  {tabSwitchCount >= MAX_VIOLATIONS - 1
+                    ? '🚨 Lần vi phạm tiếp theo sẽ TỰ ĐỘNG NỘP BÀI!'
+                    : `Bạn còn ${MAX_VIOLATIONS - tabSwitchCount} lần cảnh báo trước khi bài bị nộp tự động.`}
+                </p>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowViolationWarning(false);
+                  enterFullscreen();
+                }}
+                className="w-full px-4 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md transition-all flex items-center justify-center gap-2"
+              >
+                <Maximize className="w-4 h-4" />
+                Quay lại làm bài
+              </button>
             </div>
           </div>
         </div>

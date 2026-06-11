@@ -463,4 +463,22 @@ export class ExamSessionService {
     }
     return shuffled;
   }
+
+  /** Ghi nhận vi phạm: rời tab/thoát fullscreen */
+  async reportViolation(sessionId: string) {
+    const session = await this.prisma.examSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session || session.status !== 'IN_PROGRESS') {
+      return { tabSwitchCount: session?.tabSwitchCount ?? 0 };
+    }
+
+    const updated = await this.prisma.examSession.update({
+      where: { id: sessionId },
+      data: { tabSwitchCount: { increment: 1 } },
+    });
+
+    return { tabSwitchCount: updated.tabSwitchCount };
+  }
 }

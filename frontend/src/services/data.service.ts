@@ -47,6 +47,11 @@ export const examSessionService = {
     const { data } = await api.get(`/exam-sessions/${sessionId}/status`);
     return data.data;
   },
+
+  reportViolation: async (sessionId: string): Promise<{ tabSwitchCount: number }> => {
+    const { data } = await api.post(`/exam-sessions/${sessionId}/violation`);
+    return data.data;
+  },
 };
 
 export const resultService = {

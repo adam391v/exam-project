@@ -34,4 +34,9 @@ export class ExamSessionController {
   getSessionStatus(@Param('id') id: string) {
     return this.examSessionService.getSessionStatus(id);
   }
+
+  @Post(':id/violation')
+  reportViolation(@Param('id') id: string) {
+    return this.examSessionService.reportViolation(id);
+  }
 }
