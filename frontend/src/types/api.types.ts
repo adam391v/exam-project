@@ -115,6 +115,7 @@ export interface ExamSessionStart {
 export interface ExamAnswer {
   questionId: string;
   selectedOptionId: string | null;
+  textAnswer?: string;
   isMarked: boolean;
   isViewed: boolean;
 }

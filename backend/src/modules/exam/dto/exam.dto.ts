@@ -150,10 +150,17 @@ export class CreateExamQuestionDto {
   @IsInt()
   sortOrder?: number;
 
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateOptionDto)
-  options: CreateOptionDto[];
+  options?: CreateOptionDto[];
+
+  /** Danh sách đáp án đúng cho câu FILL_IN_BLANK */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  correctAnswers?: string[];
 }
 
 export class UpdateExamQuestionDto {
@@ -191,6 +198,11 @@ export class UpdateExamQuestionDto {
   @ValidateNested({ each: true })
   @Type(() => CreateOptionDto)
   options?: CreateOptionDto[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  correctAnswers?: string[];
 }
 
 export class ExamFilterDto {

@@ -41,6 +41,7 @@ interface QuestionForm {
   explanation: string;
   type: string;
   options: QuestionOption[];
+  correctAnswers: string[];
 }
 
 interface SubQuestionForm {
@@ -69,6 +70,7 @@ const defaultOptions: QuestionOption[] = [
 const defaultForm: QuestionForm = {
   content: '', imageUrl: '', audioUrl: '', youtubeUrl: '', explanation: '', type: 'SINGLE_CHOICE',
   options: defaultOptions.map(o => ({ ...o })),
+  correctAnswers: [''],
 };
 
 const defaultSubQuestion: SubQuestionForm = {
@@ -167,10 +169,12 @@ export default function ExamDetailAdminPage() {
 
   const openEdit = (q: any) => {
     setEditingQuestionId(q.id);
+    const isFillInBlank = q.type === 'FILL_IN_BLANK';
     setForm({
       content: q.content, imageUrl: q.imageUrl || '', audioUrl: q.audioUrl || '', youtubeUrl: q.youtubeUrl || '',
       explanation: q.explanation || '', type: q.type,
-      options: q.options?.map((o: any) => ({ label: o.label, content: o.content, isCorrect: o.isCorrect })) || [],
+      options: isFillInBlank ? [] : (q.options?.map((o: any) => ({ label: o.label, content: o.content, isCorrect: o.isCorrect })) || []),
+      correctAnswers: isFillInBlank && q.options?.length ? q.options.map((o: any) => o.content) : [''],
     });
     setShowQuestionModal(true);
   };
@@ -179,9 +183,18 @@ export default function ExamDetailAdminPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.options.some((o) => o.isCorrect)) { toast.error('Phải chọn ít nhất 1 đáp án đúng'); return; }
-    if (editingQuestionId) { updateMutation.mutate({ questionId: editingQuestionId, dto: form }); }
-    else { addMutation.mutate(form); }
+    if (form.type === 'FILL_IN_BLANK') {
+      const answers = form.correctAnswers.map(a => a.trim()).filter(a => a);
+      if (answers.length === 0) { toast.error('Phải nhập ít nhất 1 đáp án đúng'); return; }
+      const dto = { ...form, correctAnswers: answers, options: undefined };
+      if (editingQuestionId) { updateMutation.mutate({ questionId: editingQuestionId, dto }); }
+      else { addMutation.mutate(dto); }
+    } else {
+      if (!form.options.some((o) => o.isCorrect)) { toast.error('Phải chọn ít nhất 1 đáp án đúng'); return; }
+      const dto = { ...form, correctAnswers: undefined };
+      if (editingQuestionId) { updateMutation.mutate({ questionId: editingQuestionId, dto }); }
+      else { addMutation.mutate(dto); }
+    }
   };
 
   const updateOption = (idx: number, field: string, value: any) => {
@@ -408,7 +421,10 @@ export default function ExamDetailAdminPage() {
 
   function renderSingleQuestion(q: any, number: number, key: number) {
     const isExpanded = expandedQuestion === q.id;
-    const correctOpts = q.options?.filter((o: any) => o.isCorrect).map((o: any) => o.label).join(', ');
+    const isFillBlank = q.type === 'FILL_IN_BLANK';
+    const correctOpts = isFillBlank
+      ? q.options?.map((o: any) => o.content).join('; ')
+      : q.options?.filter((o: any) => o.isCorrect).map((o: any) => o.label).join(', ');
     return (
       <div key={`single-${key}`} className="group">
         <div className="flex items-center gap-3 px-6 py-4 cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => setExpandedQuestion(isExpanded ? null : q.id)}>
@@ -418,21 +434,33 @@ export default function ExamDetailAdminPage() {
           </div>
           <div className="flex-1 text-sm text-slate-800 line-clamp-1"><HtmlContent html={q.content} className="[&>*]:my-0 inline" /></div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            <span className="text-xs text-slate-400 hidden sm:block">Đáp án: <span className="font-semibold text-green-600">{correctOpts}</span></span>
-            <span className="text-xs bg-slate-100 px-2 py-0.5 rounded">{q.type === 'SINGLE_CHOICE' ? 'Một' : 'Nhiều'}</span>
+            <span className="text-xs text-slate-400 hidden sm:block">{isFillBlank ? 'ĐA' : 'Đáp án'}: <span className="font-semibold text-green-600">{correctOpts}</span></span>
+            <span className={`text-xs px-2 py-0.5 rounded ${isFillBlank ? 'bg-amber-100 text-amber-700' : 'bg-slate-100'}`}>{q.type === 'SINGLE_CHOICE' ? 'Một' : q.type === 'FILL_IN_BLANK' ? 'Điền' : 'Nhiều'}</span>
             {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
           </div>
         </div>
         {isExpanded && (
           <div className="px-6 pb-4 bg-slate-50 border-t border-slate-100">
             <div className="pl-12 pt-3 space-y-2">
-              {q.options?.map((opt: any) => (
-                <div key={opt.id} className={`flex items-center gap-3 p-2.5 rounded-lg text-sm ${opt.isCorrect ? 'bg-green-50 text-green-800 font-medium' : 'text-slate-600'}`}>
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${opt.isCorrect ? 'bg-green-200 text-green-800' : 'bg-slate-200 text-slate-600'}`}>{opt.label}</span>
-                  <span className="flex-1">{opt.content}</span>
-                  {opt.isCorrect && <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />}
+              {isFillBlank ? (
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-slate-500">Đáp án đúng được chấp nhận:</p>
+                  {q.options?.map((opt: any, oidx: number) => (
+                    <div key={oidx} className="flex items-center gap-2 p-2 bg-green-50 rounded-lg text-sm text-green-800 font-medium">
+                      <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                      <span>{opt.content}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                q.options?.map((opt: any) => (
+                  <div key={opt.id} className={`flex items-center gap-3 p-2.5 rounded-lg text-sm ${opt.isCorrect ? 'bg-green-50 text-green-800 font-medium' : 'text-slate-600'}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${opt.isCorrect ? 'bg-green-200 text-green-800' : 'bg-slate-200 text-slate-600'}`}>{opt.label}</span>
+                    <span className="flex-1">{opt.content}</span>
+                    {opt.isCorrect && <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />}
+                  </div>
+                ))
+              )}
               {q.explanation && (
                 <div className="mt-2 p-3 bg-blue-50 rounded-lg">
                   <p className="text-xs text-blue-600 font-medium mb-0.5">Giải thích:</p>
@@ -534,11 +562,12 @@ export default function ExamDetailAdminPage() {
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Loại câu hỏi</label>
               <AppSelect
-                value={{ value: form.type, label: form.type === 'SINGLE_CHOICE' ? 'Một đáp án' : 'Nhiều đáp án' }}
+                value={{ value: form.type, label: form.type === 'SINGLE_CHOICE' ? 'Một đáp án' : form.type === 'FILL_IN_BLANK' ? 'Điền đáp án' : 'Nhiều đáp án' }}
                 onChange={(opt) => opt && setForm({ ...form, type: opt.value })}
                 options={[
                   { value: 'SINGLE_CHOICE', label: 'Một đáp án' },
                   { value: 'MULTIPLE_CHOICE', label: 'Nhiều đáp án' },
+                  { value: 'FILL_IN_BLANK', label: 'Điền đáp án' },
                 ]}
                 isSearchable={false}
                 placeholder="Chọn loại câu hỏi"
@@ -567,22 +596,57 @@ export default function ExamDetailAdminPage() {
                 </div>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Đáp án *</label>
-              <div className="space-y-3">
-                {form.options.map((opt, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
-                      <input type={form.type === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'} name="correct" checked={opt.isCorrect} onChange={(e) => updateOption(idx, 'isCorrect', e.target.checked)}
-                        className="w-4 h-4 text-green-600 focus:ring-green-500" />
-                      <span className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-700">{opt.label}</span>
-                    </label>
-                    <input type="text" value={opt.content} onChange={(e) => updateOption(idx, 'content', e.target.value)}
-                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={`Nội dung đáp án ${opt.label}`} />
-                  </div>
-                ))}
+
+            {/* Đáp án: tuỳ theo loại câu hỏi */}
+            {form.type === 'FILL_IN_BLANK' ? (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Đáp án đúng * <span className="text-xs text-slate-400 font-normal">(mỗi ô input tương ứng với 1 chỗ trống cần điền)</span></label>
+                <div className="space-y-3">
+                  {form.correctAnswers.map((ans, idx) => (
+                    <div key={idx} className="flex items-center gap-2">
+                      <span className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-700">{idx + 1}</span>
+                      <input
+                        type="text"
+                        value={ans}
+                        onChange={(e) => {
+                          const newAns = [...form.correctAnswers];
+                          newAns[idx] = e.target.value;
+                          setForm({ ...form, correctAnswers: newAns });
+                        }}
+                        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder={`Đáp án đúng cho ô trống ${idx + 1}...`}
+                      />
+                      {form.correctAnswers.length > 1 && (
+                        <button type="button" onClick={() => {
+                          setForm({ ...form, correctAnswers: form.correctAnswers.filter((_, i) => i !== idx) });
+                        }} className="p-2 text-slate-400 hover:text-red-500"><X className="w-4 h-4" /></button>
+                      )}
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => setForm({ ...form, correctAnswers: [...form.correctAnswers, ''] })} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all w-fit">
+                    <Plus className="w-3.5 h-3.5" /> Thêm chỗ trống
+                  </button>
+                </div>
+                <p className="text-xs text-slate-400 mt-2">Hệ thống không phân biệt hoa/thường khi chấm. Mỗi ô trống yêu cầu nhập chính xác 1 đáp án (hỗ trợ nhiều ô trống trên 1 câu hỏi).</p>
               </div>
-            </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Đáp án *</label>
+                <div className="space-y-3">
+                  {form.options.map((opt, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
+                        <input type={form.type === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'} name="correct" checked={opt.isCorrect} onChange={(e) => updateOption(idx, 'isCorrect', e.target.checked)}
+                          className="w-4 h-4 text-green-600 focus:ring-green-500" />
+                        <span className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-700">{opt.label}</span>
+                      </label>
+                      <input type="text" value={opt.content} onChange={(e) => updateOption(idx, 'content', e.target.value)}
+                        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={`Nội dung đáp án ${opt.label}`} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Giải thích</label>
               <RichTextEditor content={form.explanation} onChange={(html) => setForm({ ...form, explanation: html })} placeholder="Giải thích đáp án (không bắt buộc)" />

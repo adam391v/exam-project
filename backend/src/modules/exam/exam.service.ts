@@ -191,6 +191,26 @@ export class ExamService {
     });
     const nextOrder = (lastQuestion?.sortOrder ?? -1) + 1;
 
+    // Build options: FILL_IN_BLANK dùng correctAnswers, còn lại dùng dto.options
+    const isFillInBlank = dto.type === 'FILL_IN_BLANK';
+    let optionsCreate: any[] = [];
+
+    if (isFillInBlank && dto.correctAnswers?.length) {
+      optionsCreate = dto.correctAnswers.map((ans, idx) => ({
+        label: `ANS${idx + 1}`,
+        content: ans.trim(),
+        isCorrect: true,
+        sortOrder: idx,
+      }));
+    } else if (dto.options?.length) {
+      optionsCreate = dto.options.map((opt, idx) => ({
+        label: opt.label,
+        content: opt.content,
+        isCorrect: opt.isCorrect ?? false,
+        sortOrder: opt.sortOrder ?? idx,
+      }));
+    }
+
     const question = await this.prisma.question.create({
       data: {
         examId,
@@ -201,14 +221,7 @@ export class ExamService {
         explanation: dto.explanation,
         type: (dto.type as any) || 'SINGLE_CHOICE',
         sortOrder: dto.sortOrder ?? nextOrder,
-        options: {
-          create: dto.options.map((opt, index) => ({
-            label: opt.label,
-            content: opt.content,
-            isCorrect: opt.isCorrect ?? false,
-            sortOrder: opt.sortOrder ?? index,
-          })),
-        },
+        options: { create: optionsCreate },
       },
       include: {
         options: { orderBy: { sortOrder: 'asc' } },
@@ -235,27 +248,37 @@ export class ExamService {
       throw new NotFoundException('Không tìm thấy câu hỏi trong đề thi');
     }
 
-    const { options, ...questionData } = dto;
+    const { options, correctAnswers, ...questionData } = dto;
 
-    if (options) {
-      // Xoá options cũ + tạo mới
-      await this.prisma.questionOption.deleteMany({
-        where: { questionId },
-      });
+    const isFillInBlank = (dto.type || question.type) === 'FILL_IN_BLANK';
+
+    // Xác định options cần tạo
+    let optionsToCreate: any[] | null = null;
+    if (isFillInBlank && correctAnswers?.length) {
+      optionsToCreate = correctAnswers.map((ans, idx) => ({
+        label: `ANS${idx + 1}`,
+        content: ans.trim(),
+        isCorrect: true,
+        sortOrder: idx,
+      }));
+    } else if (options) {
+      optionsToCreate = options.map((opt, idx) => ({
+        label: opt.label,
+        content: opt.content,
+        isCorrect: opt.isCorrect ?? false,
+        sortOrder: opt.sortOrder ?? idx,
+      }));
+    }
+
+    if (optionsToCreate) {
+      await this.prisma.questionOption.deleteMany({ where: { questionId } });
 
       return this.prisma.question.update({
         where: { id: questionId },
         data: {
           ...questionData,
           type: questionData.type as any,
-          options: {
-            create: options.map((opt, index) => ({
-              label: opt.label,
-              content: opt.content,
-              isCorrect: opt.isCorrect ?? false,
-              sortOrder: opt.sortOrder ?? index,
-            })),
-          },
+          options: { create: optionsToCreate },
         },
         include: {
           options: { orderBy: { sortOrder: 'asc' } },
@@ -452,7 +475,7 @@ export class ExamService {
       content: string;
       options: Array<{ label: string; content: string; isCorrect: boolean }>;
       explanation?: string;
-      type?: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+      type?: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'FILL_IN_BLANK';
     }>,
     groups?: Array<{
       title?: string;
@@ -461,7 +484,7 @@ export class ExamService {
         content: string;
         options: Array<{ label: string; content: string; isCorrect: boolean }>;
         explanation?: string;
-        type?: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+        type?: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'FILL_IN_BLANK';
       }>;
     }>,
   ) {

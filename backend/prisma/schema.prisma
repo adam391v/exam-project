@@ -84,6 +84,7 @@ model Exam {
 enum QuestionType {
   SINGLE_CHOICE
   MULTIPLE_CHOICE
+  FILL_IN_BLANK
 }
 
 model Question {
@@ -196,6 +197,7 @@ model ExamAnswer {
   sessionId        String   @map("session_id")
   questionId       String   @map("question_id")
   selectedOptionId String?  @map("selected_option_id")
+  textAnswer       String?  @map("text_answer")
   isMarked         Boolean  @default(false) @map("is_marked")
   isViewed         Boolean  @default(false) @map("is_viewed")
 

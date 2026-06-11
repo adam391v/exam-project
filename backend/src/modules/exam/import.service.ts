@@ -5,7 +5,7 @@ export interface ParsedQuestion {
   content: string;
   options: Array<{ label: string; content: string; isCorrect: boolean }>;
   explanation?: string;
-  type: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE';
+  type: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'FILL_IN_BLANK';
 }
 
 export interface ParsedGroup {
@@ -119,6 +119,24 @@ export class ImportService {
           content: noiDungChung,
           questions: [],
         };
+        continue;
+      }
+
+      // Câu điền đáp án
+      if (loai === 'ĐIỀN' || loai === 'DIEN' || loai === 'FILL') {
+        if (currentGroup && currentGroup.questions.length > 0) {
+          groups.push(currentGroup);
+          currentGroup = null;
+        }
+        try {
+          const question = this.parseFillInBlankRow(row, rowNum);
+          questions.push(question);
+        } catch (error) {
+          errors.push({
+            row: rowNum,
+            message: error instanceof Error ? error.message : 'Lỗi không xác định',
+          });
+        }
         continue;
       }
 
@@ -237,5 +255,38 @@ export class ImportService {
     }));
 
     return { content, options, explanation, type };
+  }
+
+  /**
+   * Parse 1 hàng câu hỏi điền đáp án (FILL_IN_BLANK)
+   * Format: | ĐIỀN | (trống) | Câu hỏi | (trống) | (trống) | (trống) | (trống) | Đáp án đúng | Giải thích |
+   * Đáp án đúng phân cách bằng ';' (hỗ trợ nhiều đáp án)
+   */
+  private parseFillInBlankRow(row: any[], rowNum: number): ParsedQuestion {
+    const content = String(row[2] || '').trim();
+    const correctAnswerRaw = String(row[7] || '').trim();
+    const explanation = row[8] ? String(row[8]).trim() : undefined;
+
+    if (!content) {
+      throw new Error(`Hàng ${rowNum}: Nội dung câu hỏi không được để trống`);
+    }
+
+    if (!correctAnswerRaw) {
+      throw new Error(`Hàng ${rowNum}: Đáp án đúng không được để trống cho câu điền đáp án`);
+    }
+
+    // Phân tách nhiều đáp án bằng ';'
+    const answers = correctAnswerRaw
+      .split(';')
+      .map((a) => a.trim())
+      .filter((a) => a.length > 0);
+
+    const options = answers.map((ans, idx) => ({
+      label: `ANS${idx + 1}`,
+      content: ans,
+      isCorrect: true,
+    }));
+
+    return { content, options, explanation, type: 'FILL_IN_BLANK' };
   }
 }

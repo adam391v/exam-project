@@ -28,6 +28,10 @@ export class SaveAnswerDto {
   selectedOptionId?: string;
 
   @IsOptional()
+  @IsString()
+  textAnswer?: string;
+
+  @IsOptional()
   @IsBoolean()
   isMarked?: boolean;
 

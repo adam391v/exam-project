@@ -61,6 +61,38 @@ export class ResultService {
 
       response.review = questions.map((q) => {
         const answer = answers.find((a) => a.questionId === q.id);
+
+        // Tính isCorrect tuỳ theo loại câu hỏi
+        let isCorrect = false;
+        if (q.type === 'FILL_IN_BLANK') {
+          let textArr: string[] = [];
+          try {
+            textArr = JSON.parse(answer?.textAnswer || '[]');
+            if (!Array.isArray(textArr)) textArr = [];
+          } catch {
+            textArr = [];
+          }
+          const hasAnyAnswer = textArr.some(a => a && a.trim());
+          if (hasAnyAnswer) {
+            isCorrect = true;
+            const normalize = (s: string) => s.trim().toLowerCase();
+            for (let i = 0; i < q.options.length; i++) {
+              const opt = q.options[i];
+              const ans = textArr[i] || '';
+              if (normalize(opt.content) !== normalize(ans)) {
+                isCorrect = false;
+                break;
+              }
+            }
+          }
+        } else {
+          isCorrect = answer?.selectedOptionId
+            ? q.options.some(
+                (o) => o.id === answer.selectedOptionId && o.isCorrect,
+              )
+            : false;
+        }
+
         return {
           question: {
             id: q.id,
@@ -68,6 +100,7 @@ export class ResultService {
             imageUrl: q.imageUrl,
             latex: q.latex,
             explanation: q.explanation,
+            type: q.type,
             groupId: q.group?.id,
             groupContent: q.group?.content,
             groupTitle: q.group?.title,
@@ -80,11 +113,8 @@ export class ResultService {
             isCorrect: opt.isCorrect,
           })),
           selectedOptionId: answer?.selectedOptionId || null,
-          isCorrect: answer?.selectedOptionId
-            ? q.options.some(
-                (o) => o.id === answer.selectedOptionId && o.isCorrect,
-              )
-            : false,
+          textAnswer: answer?.textAnswer || null,
+          isCorrect,
         };
       });
     }

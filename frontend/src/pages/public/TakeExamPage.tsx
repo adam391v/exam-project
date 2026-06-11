@@ -112,10 +112,24 @@ function getItemQuestionIds(item: ExamItem): string[] {
   return item.subQuestions.map((sq) => sq.id);
 }
 
+function hasAnswered(a?: ExamAnswer): boolean {
+  if (!a) return false;
+  if (a.selectedOptionId) return true;
+  if (a.textAnswer) {
+    try {
+      const arr = JSON.parse(a.textAnswer);
+      if (Array.isArray(arr) && arr.some(v => v && v.trim())) return true;
+    } catch {
+      if (a.textAnswer.trim()) return true;
+    }
+  }
+  return false;
+}
+
 /** Kiểm tra item đã trả lời hết chưa */
 function isItemFullyAnswered(item: ExamItem, answers: Map<string, ExamAnswer>): boolean {
   const ids = getItemQuestionIds(item);
-  return ids.every((id) => answers.get(id)?.selectedOptionId);
+  return ids.every((id) => hasAnswered(answers.get(id)));
 }
 
 /** Kiểm tra item đã được đánh dấu chưa */
@@ -358,6 +372,56 @@ export default function TakeExamPage() {
     [sessionId, answers, isTimeUp],
   );
 
+  // Nhập đáp án text (FILL_IN_BLANK)
+  const handleTextAnswer = useCallback(
+    async (questionId: string, index: number, text: string, maxBlanks: number) => {
+      if (!sessionId || isTimeUp) return;
+
+      const current = answers.get(questionId) || {
+        questionId,
+        selectedOptionId: null,
+        isMarked: false,
+        isViewed: true,
+      };
+
+      let currentAnswers: string[] = [];
+      try {
+        currentAnswers = JSON.parse(current.textAnswer || '[]');
+        if (!Array.isArray(currentAnswers)) currentAnswers = [];
+      } catch (e) {
+        currentAnswers = [];
+      }
+      
+      while (currentAnswers.length < maxBlanks) {
+        currentAnswers.push('');
+      }
+
+      currentAnswers[index] = text;
+
+      const updated: ExamAnswer = {
+        ...current,
+        textAnswer: JSON.stringify(currentAnswers),
+        isViewed: true,
+      };
+
+      setAnswers((prev) => new Map(prev).set(questionId, updated));
+    },
+    [sessionId, answers, isTimeUp],
+  );
+
+  // Save text answer khi blur (không gửi mỗi keystroke)
+  const handleTextAnswerBlur = useCallback(
+    async (questionId: string) => {
+      if (!sessionId || isTimeUp) return;
+      const answer = answers.get(questionId);
+      if (!answer?.textAnswer) return;
+      try {
+        await examSessionService.saveAnswer(sessionId, questionId, undefined, undefined, true, answer.textAnswer);
+      } catch { /* Silent */ }
+    },
+    [sessionId, answers, isTimeUp],
+  );
+
   // Đánh dấu xem lại
   const handleToggleMark = useCallback(
     async (questionId: string) => {
@@ -451,7 +515,7 @@ export default function TakeExamPage() {
   const items = (examData?.questions || []) as unknown as ExamItem[];
   const totalItems = items.length;
   const totalQuestions = countTotalQuestions(items);
-  const answeredCount = Array.from(answers.values()).filter((a) => a.selectedOptionId).length;
+  const answeredCount = Array.from(answers.values()).filter(hasAnswered).length;
   const unansweredCount = totalQuestions - answeredCount;
   const isWarningTime = remainingSeconds > 0 && remainingSeconds < 600;
 
@@ -811,35 +875,59 @@ export default function TakeExamPage() {
         </div>
 
         {/* Đáp án */}
-        <div className="space-y-3">
-          {item.options.map((option) => {
-            const isSelected = answer?.selectedOptionId === option.id;
-            return (
-              <button
-                key={option.id}
-                onClick={() => handleSelectAnswer(item.id, option.id)}
-                className={`w-full flex items-start gap-4 p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                  isSelected
-                    ? 'border-blue-500 bg-blue-50 shadow-sm'
-                    : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
-                }`}
-              >
-                <span
-                  className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+        {item.questionType === 'FILL_IN_BLANK' ? (() => {
+          let textArr: string[] = [];
+          try { textArr = JSON.parse(answer?.textAnswer || '[]'); if (!Array.isArray(textArr)) textArr = []; } catch { textArr = []; }
+          return (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-slate-600">Nhập đáp án của bạn:</label>
+              {item.options.map((_, idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <span className="w-8 h-8 flex-shrink-0 bg-slate-100 rounded-full flex items-center justify-center text-sm font-bold text-slate-600">{idx + 1}</span>
+                  <input
+                    type="text"
+                    value={textArr[idx] || ''}
+                    onChange={(e) => handleTextAnswer(item.id, idx, e.target.value, item.options.length)}
+                    onBlur={() => handleTextAnswerBlur(item.id)}
+                    placeholder={`Nhập đáp án cho ô trống ${idx + 1}...`}
+                    className="flex-1 rounded-xl border-2 border-slate-200 px-4 py-3 text-base text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-400"
+                    disabled={isTimeUp}
+                  />
+                </div>
+              ))}
+            </div>
+          );
+        })() : (
+          <div className="space-y-3">
+            {item.options.map((option) => {
+              const isSelected = answer?.selectedOptionId === option.id;
+              return (
+                <button
+                  key={option.id}
+                  onClick={() => handleSelectAnswer(item.id, option.id)}
+                  className={`w-full flex items-start gap-4 p-4 rounded-xl border-2 text-left transition-all duration-200 ${
                     isSelected
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-100 text-slate-600'
+                      ? 'border-blue-500 bg-blue-50 shadow-sm'
+                      : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
                   }`}
                 >
-                  {option.label}
-                </span>
-                <span className={`text-sm pt-1 ${isSelected ? 'text-blue-900 font-medium' : 'text-slate-700'}`}>
-                  {option.content}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                  <span
+                    className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                      isSelected
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {option.label}
+                  </span>
+                  <span className={`text-sm pt-1 ${isSelected ? 'text-blue-900 font-medium' : 'text-slate-700'}`}>
+                    {option.content}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </>
     );
   }
@@ -908,33 +996,56 @@ export default function TakeExamPage() {
 
                 {/* Đáp án */}
                 <div className="space-y-2 ml-11">
-                  {sq.options.map((option) => {
-                    const isSelected = sqAnswer?.selectedOptionId === option.id;
+                  {sq.questionType === 'FILL_IN_BLANK' ? (() => {
+                    let textArr: string[] = [];
+                    try { textArr = JSON.parse(sqAnswer?.textAnswer || '[]'); if (!Array.isArray(textArr)) textArr = []; } catch { textArr = []; }
                     return (
-                      <button
-                        key={option.id}
-                        onClick={() => handleSelectAnswer(sq.id, option.id)}
-                        className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-all duration-200 ${
-                          isSelected
-                            ? 'border-blue-500 bg-blue-50 shadow-sm'
-                            : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
-                        }`}
-                      >
-                        <span
-                          className={`w-7 h-7 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                      <div className="space-y-3 mt-2">
+                        {sq.options.map((_, idx) => (
+                          <div key={idx} className="flex items-center gap-3">
+                            <span className="w-7 h-7 flex-shrink-0 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">{idx + 1}</span>
+                            <input
+                              type="text"
+                              value={textArr[idx] || ''}
+                              onChange={(e) => handleTextAnswer(sq.id, idx, e.target.value, sq.options.length)}
+                              onBlur={() => handleTextAnswerBlur(sq.id)}
+                              placeholder={`Đáp án ô ${idx + 1}...`}
+                              className="flex-1 rounded-lg border-2 border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-400"
+                              disabled={isTimeUp}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })() : (
+                    sq.options.map((option) => {
+                      const isSelected = sqAnswer?.selectedOptionId === option.id;
+                      return (
+                        <button
+                          key={option.id}
+                          onClick={() => handleSelectAnswer(sq.id, option.id)}
+                          className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-all duration-200 ${
                             isSelected
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-white text-slate-600 border border-slate-300'
+                              ? 'border-blue-500 bg-blue-50 shadow-sm'
+                              : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
                           }`}
                         >
-                          {option.label}
-                        </span>
-                        <span className={`text-sm pt-0.5 ${isSelected ? 'text-blue-900 font-medium' : 'text-slate-700'}`}>
-                          {option.content}
-                        </span>
-                      </button>
-                    );
-                  })}
+                          <span
+                            className={`w-7 h-7 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                              isSelected
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-white text-slate-600 border border-slate-300'
+                            }`}
+                          >
+                            {option.label}
+                          </span>
+                          <span className={`text-sm pt-0.5 ${isSelected ? 'text-blue-900 font-medium' : 'text-slate-700'}`}>
+                            {option.content}
+                          </span>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             );

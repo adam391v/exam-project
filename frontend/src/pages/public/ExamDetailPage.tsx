@@ -100,7 +100,7 @@ export default function ExamDetailPage() {
       </button>
 
       {/* Exam Info Card */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm ">
         {/* Header gradient */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 sm:px-8 py-6">
           <span className="inline-flex items-center rounded-lg bg-white/20 backdrop-blur-sm px-3 py-1 text-xs font-medium text-white mb-3">

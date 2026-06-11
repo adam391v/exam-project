@@ -31,9 +31,9 @@ export const examSessionService = {
     return data.data;
   },
 
-  saveAnswer: async (sessionId: string, questionId: string, selectedOptionId?: string, isMarked?: boolean, isViewed?: boolean) => {
+  saveAnswer: async (sessionId: string, questionId: string, selectedOptionId?: string, isMarked?: boolean, isViewed?: boolean, textAnswer?: string) => {
     const { data } = await api.post(`/exam-sessions/${sessionId}/answer`, {
-      questionId, selectedOptionId, isMarked, isViewed,
+      questionId, selectedOptionId, isMarked, isViewed, textAnswer,
     });
     return data.data;
   },

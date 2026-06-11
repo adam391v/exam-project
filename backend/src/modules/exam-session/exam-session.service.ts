@@ -140,6 +140,9 @@ export class ExamSessionService {
     if (dto.selectedOptionId !== undefined) {
       updateData.selectedOptionId = dto.selectedOptionId;
     }
+    if (dto.textAnswer !== undefined) {
+      updateData.textAnswer = dto.textAnswer;
+    }
     if (dto.isMarked !== undefined) {
       updateData.isMarked = dto.isMarked;
     }
@@ -186,6 +189,7 @@ export class ExamSessionService {
     });
 
     // Chấm điểm
+    const normalize = (s: string) => s.trim().toLowerCase();
     let correctAnswers = 0;
     let wrongAnswers = 0;
     let unanswered = 0;
@@ -193,16 +197,50 @@ export class ExamSessionService {
     for (const q of examQuestions) {
       const answer = answers.find((a) => a.questionId === q.id);
 
-      if (!answer || !answer.selectedOptionId) {
-        unanswered++;
-        continue;
-      }
+      if (q.type === 'FILL_IN_BLANK') {
+        // Câu điền đáp án: so sánh textAnswer (mảng JSON) với options
+        let textArr: string[] = [];
+        try {
+          textArr = JSON.parse(answer?.textAnswer || '[]');
+          if (!Array.isArray(textArr)) textArr = [];
+        } catch {
+          textArr = [];
+        }
 
-      const correctOptionIds = q.options.map((o) => o.id);
-      if (correctOptionIds.includes(answer.selectedOptionId)) {
-        correctAnswers++;
+        const hasAnyAnswer = textArr.some(a => a && a.trim());
+        if (!hasAnyAnswer) {
+          unanswered++;
+          continue;
+        }
+
+        // Phải trả lời đúng tất cả các ô trống
+        let isCorrect = true;
+        for (let i = 0; i < q.options.length; i++) {
+          const opt = q.options[i];
+          const ans = textArr[i] || '';
+          if (normalize(opt.content) !== normalize(ans)) {
+            isCorrect = false;
+            break;
+          }
+        }
+
+        if (isCorrect) {
+          correctAnswers++;
+        } else {
+          wrongAnswers++;
+        }
       } else {
-        wrongAnswers++;
+        // Câu trắc nghiệm: so sánh selectedOptionId
+        if (!answer || !answer.selectedOptionId) {
+          unanswered++;
+          continue;
+        }
+        const correctOptionIds = q.options.map((o) => o.id);
+        if (correctOptionIds.includes(answer.selectedOptionId)) {
+          correctAnswers++;
+        } else {
+          wrongAnswers++;
+        }
       }
     }
 
@@ -409,7 +447,7 @@ export class ExamSessionService {
         youtubeUrl: q.youtubeUrl,
         latex: q.latex,
         questionType: q.type,
-        options: q.options,
+        options: q.type === 'FILL_IN_BLANK' ? q.options.map((o: any) => ({ id: o.id })) : q.options,
       });
     }
 
@@ -429,7 +467,7 @@ export class ExamSessionService {
           imageUrl: q.imageUrl,
           latex: q.latex,
           questionType: q.type,
-          options: q.options,
+          options: q.type === 'FILL_IN_BLANK' ? q.options.map((o: any) => ({ id: o.id })) : q.options,
         })),
       });
     }

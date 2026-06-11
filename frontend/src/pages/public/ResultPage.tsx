@@ -139,26 +139,59 @@ export default function ResultPage() {
                     )}
                     <div className={`bg-white rounded-xl border p-5 ${item.isCorrect ? 'border-green-200' : 'border-red-200'}`}>
                       <div className="flex items-start gap-3 mb-4">
-                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${item.isCorrect ? 'bg-green-100 text-green-700' : item.selectedOptionId ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span>
+                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${item.isCorrect ? 'bg-green-100 text-green-700' : (item.selectedOptionId || item.textAnswer) ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span>
                         <HtmlContent html={item.question.content} className="text-sm text-slate-800" />
                       </div>
                       <div className="space-y-2 ml-10">
-                        {item.options.map((opt: any) => {
-                          const isSelected = opt.id === item.selectedOptionId;
-                          const isCorrectOption = opt.isCorrect;
-                          let optionClass = 'flex items-center gap-3 p-2.5 rounded-lg text-sm ';
-                          if (isCorrectOption) optionClass += 'bg-green-50 text-green-800 font-medium';
-                          else if (isSelected && !isCorrectOption) optionClass += 'bg-red-50 text-red-800';
-                          else optionClass += 'text-slate-600';
+                        {item.question.type === 'FILL_IN_BLANK' ? (() => {
+                          let textArr: string[] = [];
+                          try { textArr = JSON.parse(item.textAnswer || '[]'); if (!Array.isArray(textArr)) textArr = []; } catch { textArr = []; }
                           return (
-                            <div key={opt.id} className={optionClass}>
-                              <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isCorrectOption ? 'bg-green-200 text-green-800' : isSelected ? 'bg-red-200 text-red-800' : 'bg-slate-100'}`}>{opt.label}</span>
-                              <span>{opt.content}</span>
-                              {isCorrectOption && <CheckCircle2 className="w-4 h-4 text-green-600 ml-auto" />}
-                              {isSelected && !isCorrectOption && <XCircle className="w-4 h-4 text-red-500 ml-auto" />}
+                            <div className="space-y-3">
+                              {item.options.map((opt: any, oIdx: number) => {
+                                const ans = textArr[oIdx] || '';
+                                const isOptCorrect = ans.trim().toLowerCase() === opt.content.trim().toLowerCase();
+                                return (
+                                  <div key={oIdx} className="space-y-1">
+                                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Ô trống {oIdx + 1}</span>
+                                    <div className={`p-3 rounded-lg text-sm ${isOptCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+                                      <span className="text-xs font-medium text-slate-500 block mb-1">Câu trả lời của bạn:</span>
+                                      <span className={`font-medium ${isOptCorrect ? 'text-green-800' : 'text-red-800'}`}>
+                                        {ans || <span className="italic text-slate-400">Chưa trả lời</span>}
+                                      </span>
+                                      {isOptCorrect
+                                        ? <CheckCircle2 className="w-4 h-4 text-green-600 inline ml-2" />
+                                        : ans && <XCircle className="w-4 h-4 text-red-500 inline ml-2" />}
+                                    </div>
+                                    {!isOptCorrect && (
+                                      <div className="p-2.5 bg-green-50 rounded-lg border border-green-200 text-sm mt-1">
+                                        <span className="text-xs font-medium text-slate-500 block mb-1">Đáp án đúng:</span>
+                                        <span className="font-medium text-green-800">{opt.content}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           );
-                        })}
+                        })() : (
+                          item.options.map((opt: any) => {
+                            const isSelected = opt.id === item.selectedOptionId;
+                            const isCorrectOption = opt.isCorrect;
+                            let optionClass = 'flex items-center gap-3 p-2.5 rounded-lg text-sm ';
+                            if (isCorrectOption) optionClass += 'bg-green-50 text-green-800 font-medium';
+                            else if (isSelected && !isCorrectOption) optionClass += 'bg-red-50 text-red-800';
+                            else optionClass += 'text-slate-600';
+                            return (
+                              <div key={opt.id} className={optionClass}>
+                                <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isCorrectOption ? 'bg-green-200 text-green-800' : isSelected ? 'bg-red-200 text-red-800' : 'bg-slate-100'}`}>{opt.label}</span>
+                                <span>{opt.content}</span>
+                                {isCorrectOption && <CheckCircle2 className="w-4 h-4 text-green-600 ml-auto" />}
+                                {isSelected && !isCorrectOption && <XCircle className="w-4 h-4 text-red-500 ml-auto" />}
+                              </div>
+                            );
+                          })
+                        )}
                       </div>
                       {item.question.explanation && (
                         <div className="mt-3 ml-10 p-3 bg-blue-50 rounded-lg">
