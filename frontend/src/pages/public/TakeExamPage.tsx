@@ -150,7 +150,9 @@ export default function TakeExamPage() {
   const [showSubmitModal, setShowSubmitModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(!location.state);
+  const [isTimeUp, setIsTimeUp] = useState(false);
   const autoSaveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoSubmitRef = useRef(false); // Tránh submit trùng lặp
 
   // Khôi phục session khi refresh
   useEffect(() => {
@@ -203,7 +205,8 @@ export default function TakeExamPage() {
       setRemainingSeconds((prev) => {
         if (prev <= 1) {
           clearInterval(interval);
-          handleAutoSubmit();
+          // Hết giờ → auto submit
+          setIsTimeUp(true);
           return 0;
         }
         return prev - 1;
@@ -212,6 +215,24 @@ export default function TakeExamPage() {
 
     return () => clearInterval(interval);
   }, [remainingSeconds > 0]);
+
+  // Khi isTimeUp = true → tự động nộp bài
+  useEffect(() => {
+    if (!isTimeUp || !sessionId || autoSubmitRef.current) return;
+    autoSubmitRef.current = true;
+
+    const doSubmit = async () => {
+      try {
+        await examSessionService.submit(sessionId);
+        toast.info('Hết giờ! Bài thi đã được tự động nộp.');
+      } catch {
+        // Vẫn navigate dù lỗi
+      }
+      navigate(`/results/${sessionId}`);
+    };
+
+    doSubmit();
+  }, [isTimeUp, sessionId, navigate]);
 
   // Auto-save mỗi 5 giây
   useEffect(() => {
@@ -223,21 +244,10 @@ export default function TakeExamPage() {
     };
   }, []);
 
-  const handleAutoSubmit = useCallback(async () => {
-    if (!sessionId) return;
-    try {
-      await examSessionService.submit(sessionId);
-      toast.info('Hết giờ! Bài thi đã được tự động nộp.');
-      navigate(`/results/${sessionId}`);
-    } catch {
-      navigate(`/results/${sessionId}`);
-    }
-  }, [sessionId, navigate]);
-
   // Chọn đáp án
   const handleSelectAnswer = useCallback(
     async (questionId: string, optionId: string) => {
-      if (!sessionId) return;
+      if (!sessionId || isTimeUp) return;
 
       const current = answers.get(questionId) || {
         questionId,
@@ -260,13 +270,13 @@ export default function TakeExamPage() {
         // Silent fail
       }
     },
-    [sessionId, answers],
+    [sessionId, answers, isTimeUp],
   );
 
   // Đánh dấu xem lại
   const handleToggleMark = useCallback(
     async (questionId: string) => {
-      if (!sessionId) return;
+      if (!sessionId || isTimeUp) return;
 
       const current = answers.get(questionId) || {
         questionId,
@@ -489,24 +499,18 @@ export default function TakeExamPage() {
                 {items.map((item, idx) => {
                   const isCurrent = idx === currentIndex;
                   const isFullyAnswered = isItemFullyAnswered(item, answers);
-                  const isPartial = isItemPartiallyAnswered(item, answers);
                   const isMarked = isItemMarked(item, answers);
                   const isGroup = item.type === 'group';
 
-                  // Xác định câu đã được xem chưa
-                  const ids = getItemQuestionIds(item);
-                  const isViewed = ids.some((id) => answers.get(id)?.isViewed);
-
                   let className = 'w-full aspect-square rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center relative ';
 
-                  if (isFullyAnswered) {
+                  // Ưu tiên: đánh dấu > đã trả lời > chưa trả lời
+                  if (isMarked) {
+                    className += 'q-marked ';
+                  } else if (isFullyAnswered) {
                     className += 'q-answered ';
-                  } else if (isPartial) {
-                    className += 'bg-emerald-50 border-emerald-300 text-emerald-700 ';
-                  } else if (isViewed) {
-                    className += 'q-viewed ';
                   } else {
-                    className += 'q-unviewed ';
+                    className += 'q-unanswered ';
                   }
 
                   if (isCurrent) {
@@ -524,9 +528,6 @@ export default function TakeExamPage() {
                       {isGroup && (
                         <Layers className="absolute -bottom-0.5 -right-0.5 w-3 h-3 text-purple-500" />
                       )}
-                      {isMarked && (
-                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full border-2 border-white" />
-                      )}
                     </button>
                   );
                 })}
@@ -538,10 +539,10 @@ export default function TakeExamPage() {
                   <span className="w-3 h-3 rounded bg-green-500" /> Đã trả lời
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                  <span className="w-3 h-3 rounded bg-orange-400" /> Đã xem, chưa trả lời
+                  <span className="w-3 h-3 rounded bg-slate-200 border border-slate-300" /> Chưa trả lời
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                  <span className="w-3 h-3 rounded bg-slate-200" /> Chưa xem
+                  <span className="w-3 h-3 rounded bg-yellow-400" /> Đánh dấu
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-slate-500">
                   <Layers className="w-3 h-3 text-purple-500" /> Câu hỏi chùm
