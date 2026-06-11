@@ -220,3 +220,17 @@ export const adminClassroomService = {
     return data.data;
   },
 };
+
+// ===== UPLOAD SERVICE =====
+
+export const uploadService = {
+  /** Upload file (image hoặc audio) — trả về URL tương đối */
+  upload: async (file: File): Promise<{ url: string; filename: string; type: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await api.post('/uploads', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return data.data;
+  },
+};

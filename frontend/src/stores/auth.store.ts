@@ -10,10 +10,26 @@ interface AuthState {
   loadFromStorage: () => void;
 }
 
+/** Đọc token + user từ localStorage đồng bộ ngay khi khởi tạo */
+function getInitialState(): { token: string | null; user: AdminUser | null; isAuthenticated: boolean } {
+  try {
+    const token = localStorage.getItem('accessToken');
+    const userStr = localStorage.getItem('user');
+    if (token && userStr) {
+      const user = JSON.parse(userStr) as AdminUser;
+      return { token, user, isAuthenticated: true };
+    }
+  } catch {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('user');
+  }
+  return { token: null, user: null, isAuthenticated: false };
+}
+
+const initialState = getInitialState();
+
 export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  token: null,
-  isAuthenticated: false,
+  ...initialState,
 
   setAuth: (token: string, user: AdminUser) => {
     localStorage.setItem('accessToken', token);
@@ -28,16 +44,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   loadFromStorage: () => {
-    const token = localStorage.getItem('accessToken');
-    const userStr = localStorage.getItem('user');
-    if (token && userStr) {
-      try {
-        const user = JSON.parse(userStr) as AdminUser;
-        set({ token, user, isAuthenticated: true });
-      } catch {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('user');
-      }
-    }
+    const state = getInitialState();
+    set(state);
   },
 }));

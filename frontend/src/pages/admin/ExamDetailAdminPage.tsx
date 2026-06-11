@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import RichTextEditor from '../../components/RichTextEditor';
 import HtmlContent from '../../components/HtmlContent';
+import FileUploadInput from '../../components/FileUploadInput';
 import AppSelect from '../../components/AppSelect';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -34,6 +35,9 @@ interface QuestionOption {
 
 interface QuestionForm {
   content: string;
+  imageUrl: string;
+  audioUrl: string;
+  youtubeUrl: string;
   explanation: string;
   type: string;
   options: QuestionOption[];
@@ -50,6 +54,8 @@ interface GroupForm {
   title: string;
   content: string;
   imageUrl: string;
+  audioUrl: string;
+  youtubeUrl: string;
   questions: SubQuestionForm[];
 }
 
@@ -61,7 +67,7 @@ const defaultOptions: QuestionOption[] = [
 ];
 
 const defaultForm: QuestionForm = {
-  content: '', explanation: '', type: 'SINGLE_CHOICE',
+  content: '', imageUrl: '', audioUrl: '', youtubeUrl: '', explanation: '', type: 'SINGLE_CHOICE',
   options: defaultOptions.map(o => ({ ...o })),
 };
 
@@ -71,7 +77,7 @@ const defaultSubQuestion: SubQuestionForm = {
 };
 
 const defaultGroupForm: GroupForm = {
-  title: '', content: '', imageUrl: '',
+  title: '', content: '', imageUrl: '', audioUrl: '', youtubeUrl: '',
   questions: [{ ...defaultSubQuestion, options: defaultOptions.map(o => ({ ...o })) }],
 };
 
@@ -162,7 +168,8 @@ export default function ExamDetailAdminPage() {
   const openEdit = (q: any) => {
     setEditingQuestionId(q.id);
     setForm({
-      content: q.content, explanation: q.explanation || '', type: q.type,
+      content: q.content, imageUrl: q.imageUrl || '', audioUrl: q.audioUrl || '', youtubeUrl: q.youtubeUrl || '',
+      explanation: q.explanation || '', type: q.type,
       options: q.options?.map((o: any) => ({ label: o.label, content: o.content, isCorrect: o.isCorrect })) || [],
     });
     setShowQuestionModal(true);
@@ -190,7 +197,7 @@ export default function ExamDetailAdminPage() {
   const openCreateGroup = () => {
     setEditingGroupId(null);
     setGroupForm({
-      title: '', content: '', imageUrl: '',
+      title: '', content: '', imageUrl: '', audioUrl: '', youtubeUrl: '',
       questions: [{ ...defaultSubQuestion, options: defaultOptions.map(o => ({ ...o })) }],
     });
     setShowGroupModal(true);
@@ -200,6 +207,7 @@ export default function ExamDetailAdminPage() {
     setEditingGroupId(g.id);
     setGroupForm({
       title: g.title || '', content: g.content || '', imageUrl: g.imageUrl || '',
+      audioUrl: g.audioUrl || '', youtubeUrl: g.youtubeUrl || '',
       questions: g.questions?.map((q: any) => ({
         content: q.content, explanation: q.explanation || '', type: q.type || 'SINGLE_CHOICE',
         options: q.options?.map((o: any) => ({ label: o.label, content: o.content, isCorrect: o.isCorrect })) || defaultOptions.map(o => ({ ...o })),
@@ -540,6 +548,25 @@ export default function ExamDetailAdminPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung câu hỏi *</label>
               <RichTextEditor content={form.content} onChange={(html) => setForm({ ...form, content: html })} placeholder="Nhập nội dung câu hỏi... (hỗ trợ LaTeX: $\frac{a}{b}$)" />
             </div>
+            {/* Media inputs */}
+            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+              <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">🖼️ Đa phương tiện (không bắt buộc)</p>
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Hình ảnh</label>
+                  <FileUploadInput type="image" value={form.imageUrl} onChange={(url) => setForm({ ...form, imageUrl: url })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Audio</label>
+                  <FileUploadInput type="audio" value={form.audioUrl} onChange={(url) => setForm({ ...form, audioUrl: url })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Link YouTube</label>
+                  <input type="url" value={form.youtubeUrl} onChange={(e) => setForm({ ...form, youtubeUrl: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://youtube.com/..." />
+                </div>
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">Đáp án *</label>
               <div className="space-y-3">
@@ -593,6 +620,22 @@ export default function ExamDetailAdminPage() {
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung chung * (Rich Text + LaTeX)</label>
                 <RichTextEditor content={groupForm.content} onChange={(html) => setGroupForm({ ...groupForm, content: html })} placeholder="Nhập đoạn văn, bài toán, bảng dữ liệu..." />
+              </div>
+              {/* Media inputs cho group */}
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Hình ảnh</label>
+                  <FileUploadInput type="image" value={groupForm.imageUrl} onChange={(url) => setGroupForm({ ...groupForm, imageUrl: url })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Audio</label>
+                  <FileUploadInput type="audio" value={groupForm.audioUrl} onChange={(url) => setGroupForm({ ...groupForm, audioUrl: url })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Link YouTube</label>
+                  <input type="url" value={groupForm.youtubeUrl} onChange={(e) => setGroupForm({ ...groupForm, youtubeUrl: e.target.value })}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="https://youtube.com/..." />
+                </div>
               </div>
             </div>
 

@@ -13,8 +13,129 @@ import {
   AlertTriangle,
   X,
   Check,
+  Layers,
 } from 'lucide-react';
 import type { ExamSessionStart, ExamAnswer } from '../../types/api.types';
+
+// ===== Types cho structured items =====
+interface SubQuestion {
+  id: string;
+  content: string;
+  imageUrl?: string;
+  latex?: string;
+  questionType: string;
+  options: Array<{ id: string; label: string; content: string; sortOrder: number }>;
+}
+
+interface SingleItem {
+  type: 'single';
+  id: string;
+  content: string;
+  imageUrl?: string;
+  audioUrl?: string;
+  youtubeUrl?: string;
+  latex?: string;
+  questionType: string;
+  options: Array<{ id: string; label: string; content: string; sortOrder: number }>;
+}
+
+interface GroupItem {
+  type: 'group';
+  id: string;
+  groupContent: string;
+  groupTitle?: string;
+  groupImageUrl?: string;
+  groupAudioUrl?: string;
+  groupYoutubeUrl?: string;
+  subQuestions: SubQuestion[];
+}
+
+type ExamItem = SingleItem | GroupItem;
+
+/** Trích xuất YouTube video ID từ URL */
+function extractYouTubeId(url: string): string | null {
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|shorts\/))([-\w]{11})/);
+  return match ? match[1] : null;
+}
+
+/** Chuyển URL tương đối thành tuyệt đối (cho file upload local) */
+function resolveUrl(url?: string): string {
+  if (!url) return '';
+  if (url.startsWith('http')) return url;
+  const base = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+  return `${base}${url}`;
+}
+
+/** Render khối đa phương tiện (image, audio, YouTube) */
+function MediaBlock({ imageUrl, audioUrl, youtubeUrl }: { imageUrl?: string; audioUrl?: string; youtubeUrl?: string }) {
+  const hasMedia = imageUrl || audioUrl || youtubeUrl;
+  if (!hasMedia) return null;
+
+  const ytId = youtubeUrl ? extractYouTubeId(youtubeUrl) : null;
+
+  return (
+    <div className="space-y-3 mb-4">
+      {imageUrl && (
+        <img src={resolveUrl(imageUrl)} alt="Hình minh họa" className="max-w-lg rounded-xl border border-slate-200" />
+      )}
+      {audioUrl && (
+        <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
+          <span className="text-xs font-semibold text-blue-600">🔊 Audio</span>
+          <audio controls className="flex-1 h-10">
+            <source src={resolveUrl(audioUrl)} />
+            Trình duyệt không hỗ trợ audio.
+          </audio>
+        </div>
+      )}
+      {ytId && (
+        <div className="relative w-full max-w-lg aspect-video rounded-xl overflow-hidden border border-slate-200">
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${ytId}`}
+            title="YouTube video"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 w-full h-full"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===== Helpers =====
+/** Lấy tất cả question IDs của 1 item (1 cho single, N cho group) */
+function getItemQuestionIds(item: ExamItem): string[] {
+  if (item.type === 'single') return [item.id];
+  return item.subQuestions.map((sq) => sq.id);
+}
+
+/** Kiểm tra item đã trả lời hết chưa */
+function isItemFullyAnswered(item: ExamItem, answers: Map<string, ExamAnswer>): boolean {
+  const ids = getItemQuestionIds(item);
+  return ids.every((id) => answers.get(id)?.selectedOptionId);
+}
+
+/** Kiểm tra item đã trả lời 1 phần (chỉ áp dụng group) */
+function isItemPartiallyAnswered(item: ExamItem, answers: Map<string, ExamAnswer>): boolean {
+  if (item.type === 'single') return false;
+  const ids = getItemQuestionIds(item);
+  const answeredCount = ids.filter((id) => answers.get(id)?.selectedOptionId).length;
+  return answeredCount > 0 && answeredCount < ids.length;
+}
+
+/** Kiểm tra item đã được đánh dấu chưa */
+function isItemMarked(item: ExamItem, answers: Map<string, ExamAnswer>): boolean {
+  const ids = getItemQuestionIds(item);
+  return ids.some((id) => answers.get(id)?.isMarked);
+}
+
+/** Đếm tổng câu hỏi thực tế (cho scoring) */
+function countTotalQuestions(items: ExamItem[]): number {
+  return items.reduce((sum, item) => {
+    if (item.type === 'single') return sum + 1;
+    return sum + item.subQuestions.length;
+  }, 0);
+}
 
 export default function TakeExamPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -133,11 +254,10 @@ export default function TakeExamPage() {
 
       setAnswers((prev) => new Map(prev).set(questionId, updated));
 
-      // Save to backend
       try {
         await examSessionService.saveAnswer(sessionId, questionId, optionId, undefined, true);
       } catch {
-        // Silent fail — sẽ retry qua auto-save
+        // Silent fail
       }
     },
     [sessionId, answers],
@@ -172,42 +292,40 @@ export default function TakeExamPage() {
     [sessionId, answers],
   );
 
-  // Mark câu hỏi là đã xem
-  const markViewed = useCallback(
-    async (questionId: string) => {
+  // Mark tất cả câu trong group là đã xem
+  const markItemViewed = useCallback(
+    async (item: ExamItem) => {
       if (!sessionId) return;
-      const current = answers.get(questionId);
-      if (current?.isViewed) return;
-
-      const updated: ExamAnswer = {
-        questionId,
-        selectedOptionId: current?.selectedOptionId || null,
-        isMarked: current?.isMarked || false,
-        isViewed: true,
-      };
-
-      setAnswers((prev) => new Map(prev).set(questionId, updated));
-
-      try {
-        await examSessionService.saveAnswer(sessionId, questionId, undefined, undefined, true);
-      } catch {
-        // Silent
+      const ids = getItemQuestionIds(item);
+      for (const qId of ids) {
+        const current = answers.get(qId);
+        if (current?.isViewed) continue;
+        const updated: ExamAnswer = {
+          questionId: qId,
+          selectedOptionId: current?.selectedOptionId || null,
+          isMarked: current?.isMarked || false,
+          isViewed: true,
+        };
+        setAnswers((prev) => new Map(prev).set(qId, updated));
+        try {
+          await examSessionService.saveAnswer(sessionId, qId, undefined, undefined, true);
+        } catch { /* Silent */ }
       }
     },
     [sessionId, answers],
   );
 
   // Chuyển câu
-  const goToQuestion = useCallback(
+  const goToItem = useCallback(
     (index: number) => {
       if (!examData) return;
-      const q = examData.questions[index];
-      if (q) {
+      const item = examData.questions[index];
+      if (item) {
         setCurrentIndex(index);
-        markViewed(q.id);
+        markItemViewed(item as unknown as ExamItem);
       }
     },
-    [examData, markViewed],
+    [examData, markItemViewed],
   );
 
   // Nộp bài
@@ -235,10 +353,12 @@ export default function TakeExamPage() {
   };
 
   // Stats
-  const totalQuestions = examData?.questions.length || 0;
+  const items = (examData?.questions || []) as unknown as ExamItem[];
+  const totalItems = items.length;
+  const totalQuestions = countTotalQuestions(items);
   const answeredCount = Array.from(answers.values()).filter((a) => a.selectedOptionId).length;
   const unansweredCount = totalQuestions - answeredCount;
-  const isWarningTime = remainingSeconds > 0 && remainingSeconds < 600; // < 10 phút
+  const isWarningTime = remainingSeconds > 0 && remainingSeconds < 600;
 
   if (isLoading || !examData) {
     return (
@@ -251,8 +371,7 @@ export default function TakeExamPage() {
     );
   }
 
-  const currentQuestion = examData.questions[currentIndex];
-  const currentAnswer = answers.get(currentQuestion?.id);
+  const currentItem = items[currentIndex] as ExamItem;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -287,91 +406,24 @@ export default function TakeExamPage() {
         {/* Cột trái — Câu hỏi */}
         <div className="flex-1 min-w-0">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8 animate-fade-in">
-            {/* Câu số */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-900">
-                Câu {currentIndex + 1}
-                <span className="text-slate-400 font-normal"> / {totalQuestions}</span>
-              </h2>
-              <button
-                onClick={() => handleToggleMark(currentQuestion.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-                  currentAnswer?.isMarked
-                    ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
-                    : 'bg-slate-100 text-slate-500 hover:bg-yellow-50 hover:text-yellow-600'
-                }`}
-              >
-                <Flag className="w-4 h-4" />
-                {currentAnswer?.isMarked ? 'Đã đánh dấu' : 'Đánh dấu'}
-              </button>
-            </div>
 
-            {/* Nội dung chung (câu hỏi chùm) */}
-            {currentQuestion.groupContent && (
-              <div className="mb-6 p-4 sm:p-5 bg-purple-50/60 rounded-xl border border-purple-100">
-                <p className="text-xs font-semibold text-purple-600 mb-2 uppercase tracking-wide">📖 Nội dung chung</p>
-                <HtmlContent html={currentQuestion.groupContent} className="text-sm text-slate-800 leading-relaxed" />
-                {currentQuestion.groupImageUrl && (
-                  <img src={currentQuestion.groupImageUrl} alt="Hình minh họa" className="mt-3 max-w-md rounded-xl border border-purple-200" />
-                )}
-              </div>
-            )}
+            {/* ===== Render item ===== */}
+            {currentItem?.type === 'single'
+              ? renderSingleItem(currentItem as SingleItem)
+              : renderGroupItem(currentItem as GroupItem)}
 
-            {/* Nội dung câu hỏi */}
-            <div className="mb-8">
-              <HtmlContent html={currentQuestion.content} className="text-base text-slate-800 leading-relaxed" />
-              {currentQuestion.imageUrl && !currentQuestion.groupContent && (
-                <img
-                  src={currentQuestion.imageUrl}
-                  alt="Hình minh họa"
-                  className="mt-4 max-w-md rounded-xl border border-slate-200"
-                />
-              )}
-            </div>
-
-            {/* Đáp án */}
-            <div className="space-y-3">
-              {currentQuestion.options.map((option) => {
-                const isSelected = currentAnswer?.selectedOptionId === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    onClick={() => handleSelectAnswer(currentQuestion.id, option.id)}
-                    className={`w-full flex items-start gap-4 p-4 rounded-xl border-2 text-left transition-all duration-200 ${
-                      isSelected
-                        ? 'border-blue-500 bg-blue-50 shadow-sm'
-                        : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
-                    }`}
-                  >
-                    <span
-                      className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
-                        isSelected
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-100 text-slate-600'
-                      }`}
-                    >
-                      {option.label}
-                    </span>
-                    <span className={`text-sm pt-1 ${isSelected ? 'text-blue-900 font-medium' : 'text-slate-700'}`}>
-                      {option.content}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Navigation buttons */}
+            {/* Navigation */}
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
               <button
-                onClick={() => goToQuestion(currentIndex - 1)}
+                onClick={() => goToItem(currentIndex - 1)}
                 disabled={currentIndex === 0}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
               >
                 <ChevronLeft className="w-4 h-4" />
                 Câu trước
               </button>
 
-              {currentIndex === totalQuestions - 1 ? (
+              {currentIndex === totalItems - 1 ? (
                 <button
                   onClick={() => setShowSubmitModal(true)}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md hover:shadow-lg transition-all"
@@ -381,7 +433,7 @@ export default function TakeExamPage() {
                 </button>
               ) : (
                 <button
-                  onClick={() => goToQuestion(currentIndex + 1)}
+                  onClick={() => goToItem(currentIndex + 1)}
                   className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-all"
                 >
                   Câu tiếp
@@ -432,19 +484,25 @@ export default function TakeExamPage() {
                 </div>
               </div>
 
-              {/* Question Navigation Grid */}
+              {/* Item Navigation Grid */}
               <div className="grid grid-cols-5 gap-2">
-                {examData.questions.map((q, idx) => {
-                  const answer = answers.get(q.id);
+                {items.map((item, idx) => {
                   const isCurrent = idx === currentIndex;
-                  const isAnswered = !!answer?.selectedOptionId;
-                  const isViewed = !!answer?.isViewed;
-                  const isMarked = !!answer?.isMarked;
+                  const isFullyAnswered = isItemFullyAnswered(item, answers);
+                  const isPartial = isItemPartiallyAnswered(item, answers);
+                  const isMarked = isItemMarked(item, answers);
+                  const isGroup = item.type === 'group';
+
+                  // Xác định câu đã được xem chưa
+                  const ids = getItemQuestionIds(item);
+                  const isViewed = ids.some((id) => answers.get(id)?.isViewed);
 
                   let className = 'w-full aspect-square rounded-lg text-xs font-semibold border transition-all cursor-pointer flex items-center justify-center relative ';
 
-                  if (isAnswered) {
+                  if (isFullyAnswered) {
                     className += 'q-answered ';
+                  } else if (isPartial) {
+                    className += 'bg-emerald-50 border-emerald-300 text-emerald-700 ';
                   } else if (isViewed) {
                     className += 'q-viewed ';
                   } else {
@@ -457,12 +515,15 @@ export default function TakeExamPage() {
 
                   return (
                     <button
-                      key={q.id}
-                      onClick={() => goToQuestion(idx)}
+                      key={item.id}
+                      onClick={() => goToItem(idx)}
                       className={className}
-                      title={`Câu ${idx + 1}`}
+                      title={`Câu ${idx + 1}${isGroup ? ' (chùm)' : ''}`}
                     >
                       {idx + 1}
+                      {isGroup && (
+                        <Layers className="absolute -bottom-0.5 -right-0.5 w-3 h-3 text-purple-500" />
+                      )}
                       {isMarked && (
                         <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-yellow-400 rounded-full border-2 border-white" />
                       )}
@@ -481,6 +542,9 @@ export default function TakeExamPage() {
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-slate-500">
                   <span className="w-3 h-3 rounded bg-slate-200" /> Chưa xem
+                </div>
+                <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                  <Layers className="w-3 h-3 text-purple-500" /> Câu hỏi chùm
                 </div>
               </div>
             </div>
@@ -566,4 +630,172 @@ export default function TakeExamPage() {
       )}
     </div>
   );
+
+  // =================== RENDER HELPERS ===================
+
+  /** Render câu hỏi đơn */
+  function renderSingleItem(item: SingleItem) {
+    const answer = answers.get(item.id);
+    return (
+      <>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-bold text-slate-900">
+            Câu {currentIndex + 1}
+            <span className="text-slate-400 font-normal"> / {totalItems}</span>
+          </h2>
+          <button
+            onClick={() => handleToggleMark(item.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              answer?.isMarked
+                ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                : 'bg-slate-100 text-slate-500 hover:bg-yellow-50 hover:text-yellow-600'
+            }`}
+          >
+            <Flag className="w-4 h-4" />
+            {answer?.isMarked ? 'Đã đánh dấu' : 'Đánh dấu'}
+          </button>
+        </div>
+
+        {/* Nội dung */}
+        <div className="mb-8">
+          <HtmlContent html={item.content} className="text-base text-slate-800 leading-relaxed" />
+          <div className="mt-4">
+            <MediaBlock imageUrl={item.imageUrl} audioUrl={item.audioUrl} youtubeUrl={item.youtubeUrl} />
+          </div>
+        </div>
+
+        {/* Đáp án */}
+        <div className="space-y-3">
+          {item.options.map((option) => {
+            const isSelected = answer?.selectedOptionId === option.id;
+            return (
+              <button
+                key={option.id}
+                onClick={() => handleSelectAnswer(item.id, option.id)}
+                className={`w-full flex items-start gap-4 p-4 rounded-xl border-2 text-left transition-all duration-200 ${
+                  isSelected
+                    ? 'border-blue-500 bg-blue-50 shadow-sm'
+                    : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
+                }`}
+              >
+                <span
+                  className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                    isSelected
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {option.label}
+                </span>
+                <span className={`text-sm pt-1 ${isSelected ? 'text-blue-900 font-medium' : 'text-slate-700'}`}>
+                  {option.content}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+
+  /** Render câu hỏi chùm (group) */
+  function renderGroupItem(item: GroupItem) {
+    const isMarked = isItemMarked(item, answers);
+    return (
+      <>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-slate-900">
+              Câu {currentIndex + 1}
+              <span className="text-slate-400 font-normal"> / {totalItems}</span>
+            </h2>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-100 text-purple-700">
+              <Layers className="w-3.5 h-3.5" />
+              Câu hỏi chùm — {item.subQuestions.length} câu
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              // Toggle mark cho tất cả câu con
+              const newMark = !isMarked;
+              item.subQuestions.forEach((sq) => {
+                const current = answers.get(sq.id);
+                if ((current?.isMarked || false) !== newMark) {
+                  handleToggleMark(sq.id);
+                }
+              });
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+              isMarked
+                ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
+                : 'bg-slate-100 text-slate-500 hover:bg-yellow-50 hover:text-yellow-600'
+            }`}
+          >
+            <Flag className="w-4 h-4" />
+            {isMarked ? 'Đã đánh dấu' : 'Đánh dấu'}
+          </button>
+        </div>
+
+        {/* Nội dung chung */}
+        <div className="mb-6 p-5 sm:p-6 bg-purple-50/60 rounded-xl border border-purple-100">
+          <p className="text-xs font-semibold text-purple-600 mb-3 uppercase tracking-wide">📖 Nội dung chung</p>
+          <HtmlContent html={item.groupContent} className="text-sm text-slate-800 leading-relaxed" />
+          <div className="mt-3">
+            <MediaBlock imageUrl={item.groupImageUrl} audioUrl={item.groupAudioUrl} youtubeUrl={item.groupYoutubeUrl} />
+          </div>
+        </div>
+
+        {/* Các câu hỏi con */}
+        <div className="space-y-5">
+          {item.subQuestions.map((sq, sqIdx) => {
+            const sqAnswer = answers.get(sq.id);
+            return (
+              <div key={sq.id} className="p-4 sm:p-5 bg-slate-50 rounded-xl border border-slate-200">
+                {/* Tiêu đề câu con */}
+                <div className="flex items-start gap-3 mb-4">
+                  <span className="w-8 h-8 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                    {currentIndex + 1}.{sqIdx + 1}
+                  </span>
+                  <HtmlContent html={sq.content} className="text-sm text-slate-800 leading-relaxed flex-1 [&>*]:my-0" />
+                </div>
+
+                {/* Đáp án */}
+                <div className="space-y-2 ml-11">
+                  {sq.options.map((option) => {
+                    const isSelected = sqAnswer?.selectedOptionId === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        onClick={() => handleSelectAnswer(sq.id, option.id)}
+                        className={`w-full flex items-start gap-3 p-3 rounded-lg border-2 text-left transition-all duration-200 ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50 shadow-sm'
+                            : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
+                        }`}
+                      >
+                        <span
+                          className={`w-7 h-7 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                            isSelected
+                              ? 'bg-blue-600 text-white'
+                              : 'bg-white text-slate-600 border border-slate-300'
+                          }`}
+                        >
+                          {option.label}
+                        </span>
+                        <span className={`text-sm pt-0.5 ${isSelected ? 'text-blue-900 font-medium' : 'text-slate-700'}`}>
+                          {option.content}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
 }

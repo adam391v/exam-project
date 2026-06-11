@@ -12,8 +12,10 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
 
-  // Security Headers
-  app.use(helmet());
+  // Security Headers (cho phép cross-origin resource cho file upload)
+  app.use(helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }));
 
   // CORS
   app.enableCors({

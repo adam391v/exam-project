@@ -92,6 +92,8 @@ model Question {
   groupId     String?      @map("group_id")
   content     String
   imageUrl    String?      @map("image_url")
+  audioUrl    String?      @map("audio_url")
+  youtubeUrl  String?      @map("youtube_url")
   latex       String?
   explanation String?
   type        QuestionType @default(SINGLE_CHOICE)
@@ -109,14 +111,16 @@ model Question {
 }
 
 model QuestionGroup {
-  id        String   @id @default(uuid())
-  examId    String   @map("exam_id")
-  title     String?
-  content   String
-  imageUrl  String?  @map("image_url")
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(uuid())
+  examId     String   @map("exam_id")
+  title      String?
+  content    String
+  imageUrl   String?  @map("image_url")
+  audioUrl   String?  @map("audio_url")
+  youtubeUrl String?  @map("youtube_url")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   exam      Exam       @relation(fields: [examId], references: [id], onDelete: Cascade)
   questions Question[]

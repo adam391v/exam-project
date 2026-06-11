@@ -66,8 +66,11 @@ export class ExamSessionService {
       throw new NotFoundException('Vui lòng chọn lớp hoặc nhập tên lớp');
     }
 
-    // Flatten questions: câu đơn + câu con từ groups
-    const flatQuestions = this.flattenQuestions(exam.questions, exam.questionGroups);
+    // Cấu trúc items: giữ nguyên group thay vì flatten
+    const items = this.structureItems(exam.questions, exam.questionGroups);
+
+    // Lấy tất cả question IDs (câu đơn + câu con trong group)
+    const allQuestionIds = this.extractAllQuestionIds(items);
 
     // Tạo phiên thi
     const session = await this.prisma.examSession.create({
@@ -82,29 +85,33 @@ export class ExamSessionService {
     });
 
     // Tạo sẵn các ExamAnswer records (chưa chọn đáp án)
-    const answerRecords = flatQuestions.map((q) => ({
-      sessionId: session.id,
-      questionId: q.id,
-    }));
-
     await this.prisma.examAnswer.createMany({
-      data: answerRecords,
+      data: allQuestionIds.map((qId) => ({
+        sessionId: session.id,
+        questionId: qId,
+      })),
     });
 
-    // Trả về thông tin cần thiết (KHÔNG có đáp án đúng)
-    let questions = flatQuestions;
-
-    // Shuffle câu hỏi nếu cần
+    // Shuffle items nếu cần (giữ nguyên group, chỉ đổi thứ tự items)
+    let shuffledItems = items;
     if (exam.shuffleQuestions) {
-      questions = this.shuffle(questions);
+      shuffledItems = this.shuffle(shuffledItems);
     }
 
     // Shuffle đáp án nếu cần
     if (exam.shuffleOptions) {
-      questions = questions.map((q) => ({
-        ...q,
-        options: this.shuffle([...q.options]),
-      }));
+      shuffledItems = shuffledItems.map((item) => {
+        if (item.type === 'single') {
+          return { ...item, options: this.shuffle([...item.options]) };
+        }
+        return {
+          ...item,
+          subQuestions: item.subQuestions.map((sq: any) => ({
+            ...sq,
+            options: this.shuffle([...sq.options]),
+          })),
+        };
+      });
     }
 
     return {
@@ -113,14 +120,14 @@ export class ExamSessionService {
         id: exam.id,
         title: exam.title,
         duration: exam.duration,
-        totalQuestions: flatQuestions.length,
+        totalQuestions: allQuestionIds.length,
         subject: exam.subject,
       },
       student: {
         name: dto.studentName,
         class: studentClass,
       },
-      questions,
+      questions: shuffledItems,
       startedAt: session.startedAt,
     };
   }
@@ -313,11 +320,12 @@ export class ExamSessionService {
       throw new NotFoundException('Không tìm thấy phiên thi');
     }
 
-    // Flatten questions
-    const flatQuestions = this.flattenQuestions(
+    // Cấu trúc items: giữ nguyên group
+    const items = this.structureItems(
       session.exam.questions as any[],
       session.exam.questionGroups as any[],
     );
+    const allQuestionIds = this.extractAllQuestionIds(items);
 
     // Kiểm tra hết giờ
     const elapsedSeconds = Math.floor(
@@ -343,14 +351,14 @@ export class ExamSessionService {
         id: session.exam.id,
         title: session.exam.title,
         duration: session.exam.duration,
-        totalQuestions: flatQuestions.length,
+        totalQuestions: allQuestionIds.length,
         subject: session.exam.subject,
       },
       student: {
         name: session.studentName,
         class: session.studentClass,
       },
-      questions: flatQuestions,
+      questions: items,
       answers: session.answers,
       startedAt: session.startedAt,
       remainingSeconds,
@@ -386,53 +394,64 @@ export class ExamSessionService {
     return session;
   }
 
-  /** Flatten câu đơn + câu chùm thành mảng phẳng */
-  private flattenQuestions(standaloneQuestions: any[], questionGroups: any[]) {
-    const result: any[] = [];
-
-    // Merge câu đơn và groups theo sortOrder
-    const items: Array<{ type: 'single'; sortOrder: number; data: any } | { type: 'group'; sortOrder: number; data: any }> = [];
+  /** Cấu trúc items: giữ nguyên group, mỗi item là 'single' hoặc 'group' */
+  private structureItems(standaloneQuestions: any[], questionGroups: any[]) {
+    const items: any[] = [];
 
     for (const q of standaloneQuestions) {
-      items.push({ type: 'single', sortOrder: q.sortOrder ?? 0, data: q });
+      items.push({
+        type: 'single',
+        sortOrder: q.sortOrder ?? 0,
+        id: q.id,
+        content: q.content,
+        imageUrl: q.imageUrl,
+        audioUrl: q.audioUrl,
+        youtubeUrl: q.youtubeUrl,
+        latex: q.latex,
+        questionType: q.type,
+        options: q.options,
+      });
     }
+
     for (const g of questionGroups) {
-      items.push({ type: 'group', sortOrder: g.sortOrder ?? 0, data: g });
+      items.push({
+        type: 'group',
+        sortOrder: g.sortOrder ?? 0,
+        id: g.id,
+        groupContent: g.content,
+        groupTitle: g.title,
+        groupImageUrl: g.imageUrl,
+        groupAudioUrl: g.audioUrl,
+        groupYoutubeUrl: g.youtubeUrl,
+        subQuestions: (g.questions || []).map((q: any) => ({
+          id: q.id,
+          content: q.content,
+          imageUrl: q.imageUrl,
+          latex: q.latex,
+          questionType: q.type,
+          options: q.options,
+        })),
+      });
     }
 
     // Sắp xếp theo sortOrder
     items.sort((a, b) => a.sortOrder - b.sortOrder);
+    return items;
+  }
 
+  /** Lấy tất cả question IDs từ structured items (cho ExamAnswer creation) */
+  private extractAllQuestionIds(items: any[]): string[] {
+    const ids: string[] = [];
     for (const item of items) {
       if (item.type === 'single') {
-        result.push({
-          id: item.data.id,
-          content: item.data.content,
-          imageUrl: item.data.imageUrl,
-          latex: item.data.latex,
-          type: item.data.type,
-          options: item.data.options,
-        });
-      } else {
-        // Group: flatten các câu con, gắn groupContent
-        for (const q of item.data.questions) {
-          result.push({
-            id: q.id,
-            content: q.content,
-            imageUrl: q.imageUrl,
-            latex: q.latex,
-            type: q.type,
-            options: q.options,
-            groupId: item.data.id,
-            groupContent: item.data.content,
-            groupImageUrl: item.data.imageUrl,
-            groupTitle: item.data.title,
-          });
+        ids.push(item.id);
+      } else if (item.type === 'group') {
+        for (const sq of item.subQuestions) {
+          ids.push(sq.id);
         }
       }
     }
-
-    return result;
+    return ids;
   }
 
   /** Fisher-Yates shuffle */

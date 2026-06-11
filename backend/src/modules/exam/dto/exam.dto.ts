@@ -127,6 +127,18 @@ export class CreateExamQuestionDto {
 
   @IsOptional()
   @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  audioUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  youtubeUrl?: string;
+
+  @IsOptional()
+  @IsString()
   explanation?: string;
 
   @IsOptional()
@@ -148,6 +160,18 @@ export class UpdateExamQuestionDto {
   @IsOptional()
   @IsString()
   content?: string;
+
+  @IsOptional()
+  @IsString()
+  imageUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  audioUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  youtubeUrl?: string;
 
   @IsOptional()
   @IsString()

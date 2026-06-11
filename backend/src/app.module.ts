@@ -10,6 +10,7 @@ import { ExamSessionModule } from './modules/exam-session/exam-session.module';
 import { ResultModule } from './modules/result/result.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ClassroomModule } from './modules/classroom/classroom.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { ClassroomModule } from './modules/classroom/classroom.module';
     ResultModule,
     DashboardModule,
     ClassroomModule,
+    UploadModule,
   ],
 })
 export class AppModule {}

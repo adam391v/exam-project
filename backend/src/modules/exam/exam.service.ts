@@ -195,6 +195,9 @@ export class ExamService {
       data: {
         examId,
         content: dto.content,
+        imageUrl: dto.imageUrl,
+        audioUrl: dto.audioUrl,
+        youtubeUrl: dto.youtubeUrl,
         explanation: dto.explanation,
         type: (dto.type as any) || 'SINGLE_CHOICE',
         sortOrder: dto.sortOrder ?? nextOrder,
@@ -293,6 +296,8 @@ export class ExamService {
     title?: string;
     content: string;
     imageUrl?: string;
+    audioUrl?: string;
+    youtubeUrl?: string;
     sortOrder?: number;
     questions: Array<{
       content: string;
@@ -321,6 +326,8 @@ export class ExamService {
         title: dto.title,
         content: dto.content,
         imageUrl: dto.imageUrl,
+        audioUrl: dto.audioUrl,
+        youtubeUrl: dto.youtubeUrl,
         sortOrder: groupSortOrder,
         questions: {
           create: dto.questions.map((q, idx) => ({
@@ -357,6 +364,8 @@ export class ExamService {
     title?: string;
     content?: string;
     imageUrl?: string;
+    audioUrl?: string;
+    youtubeUrl?: string;
     questions?: Array<{
       id?: string;
       content: string;
@@ -377,6 +386,8 @@ export class ExamService {
         title: dto.title,
         content: dto.content,
         imageUrl: dto.imageUrl,
+        audioUrl: dto.audioUrl,
+        youtubeUrl: dto.youtubeUrl,
       },
     });
 
