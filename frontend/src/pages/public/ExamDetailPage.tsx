@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Clock, FileText, BookOpen, ArrowLeft, User, GraduationCap } from 'lucide-react';
 import AppInput from '../../components/AppInput';
 import AppSelect from '../../components/AppSelect';
+import AppButton from '../../components/AppButton';
 
 // Options khối 1-12
 const gradeOptions = Array.from({ length: 12 }, (_, i) => ({
@@ -123,13 +124,14 @@ export default function ExamDetailPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-8 sm:py-12">
       {/* Back */}
-      <button
+      <AppButton
+        variant="ghost"
         onClick={() => navigate('/')}
-        className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 mb-8 transition-colors"
+        className="text-slate-500 hover:text-blue-600 mb-8 px-0 hover:bg-transparent"
+        icon={<ArrowLeft className="w-4 h-4" />}
       >
-        <ArrowLeft className="w-4 h-4" />
         Quay lại danh sách
-      </button>
+      </AppButton>
 
       {/* Exam Info Card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm ">
@@ -251,20 +253,19 @@ export default function ExamDetailPage() {
               </div>
             </div>
 
-            <button
+            <AppButton
               onClick={handleStartExam}
-              disabled={isStarting || !studentName.trim() || !selectedClassroomId || !isTimeValid}
-              className={`w-full font-semibold py-3.5 rounded-xl transition-all duration-200 shadow-md flex items-center justify-center gap-2 ${
-                !isTimeValid 
-                  ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 hover:shadow-lg disabled:opacity-50'
-              }`}
+              disabled={!studentName.trim() || !selectedClassroomId || !isTimeValid}
+              isLoading={isStarting}
+              fullWidth
+              size="lg"
+              className={!isTimeValid 
+                  ? 'bg-slate-200 text-slate-500 border-none'
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg border-none'
+              }
             >
               {isStarting ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Đang khởi tạo...
-                </>
+                'Đang khởi tạo...'
               ) : isBeforeStart ? (
                 countdownText
               ) : isAfterEnd ? (
@@ -272,7 +273,7 @@ export default function ExamDetailPage() {
               ) : (
                 'Bắt đầu làm bài'
               )}
-            </button>
+            </AppButton>
           </div>
 
           <p className="text-xs text-slate-400 text-center mt-4">

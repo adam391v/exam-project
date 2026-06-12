@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { subjectService, examService } from '../../services/data.service';
 import { Search, Clock, FileText, Users, BookOpen, ArrowRight, Sparkles } from 'lucide-react';
 import AppInput from '../../components/AppInput';
+import AppButton from '../../components/AppButton';
 import type { Subject, Exam } from '../../types/api.types';
 
 export default function HomePage() {
@@ -62,31 +63,25 @@ export default function HomePage() {
         <section className="mb-10">
           <h2 className="text-xl font-bold text-slate-900 mb-4">Môn học</h2>
           <div className="flex flex-wrap gap-3">
-            <button
+            <AppButton
               onClick={() => setSelectedSubject('')}
-              className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                !selectedSubject
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
-              }`}
+              variant={!selectedSubject ? 'primary' : 'outline'}
+              className={!selectedSubject ? '' : 'bg-white hover:text-blue-600 border-slate-200 hover:border-blue-300'}
             >
               Tất cả
-            </button>
+            </AppButton>
             {subjects.map((subject: Subject) => (
-              <button
+              <AppButton
                 key={subject.id}
                 onClick={() => setSelectedSubject(subject.id)}
-                className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
-                  selectedSubject === subject.id
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:border-blue-300 hover:text-blue-600'
-                }`}
+                variant={selectedSubject === subject.id ? 'primary' : 'outline'}
+                className={selectedSubject === subject.id ? '' : 'bg-white hover:text-blue-600 border-slate-200 hover:border-blue-300'}
               >
                 {subject.name}
                 {subject._count && (
                   <span className="ml-1.5 text-xs opacity-70">({subject._count.exams})</span>
                 )}
-              </button>
+              </AppButton>
             ))}
           </div>
         </section>

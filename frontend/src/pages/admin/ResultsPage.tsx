@@ -6,6 +6,7 @@ import { Search, Trash2, Eye, ClipboardList, ArrowLeft, Users, Clock, Download }
 import AppSelect from '../../components/AppSelect';
 import AppInput from '../../components/AppInput';
 import ConfirmModal from '../../components/ConfirmModal';
+import AppButton from '../../components/AppButton';
 import * as XLSX from 'xlsx';
 
 // Options khối 1-12
@@ -125,17 +126,13 @@ export default function ResultsPage() {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <button onClick={() => setClassDetail(null)} className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors">
-            <ArrowLeft className="w-4 h-4" /> Quay lại
-          </button>
+          <AppButton variant="ghost" onClick={() => setClassDetail(null)} icon={<ArrowLeft className="w-4 h-4" />} className="text-slate-500 hover:text-blue-600 hover:bg-transparent px-0">
+            Quay lại
+          </AppButton>
 
-          <button
-            onClick={exportExcel}
-            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
-          >
-            <Download className="w-4 h-4" />
+          <AppButton onClick={exportExcel} className="bg-green-600 hover:bg-green-700 focus:ring-green-500" icon={<Download className="w-4 h-4" />}>
             Xuất Excel
-          </button>
+          </AppButton>
         </div>
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Kết quả lớp {classDetail.studentClass}</h1>
@@ -190,7 +187,7 @@ export default function ResultsPage() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <a href={`/results/${s.id}`} target="_blank" rel="noopener noreferrer" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Xem chi tiết"><Eye className="w-4 h-4" /></a>
-                        <button onClick={() => setConfirmDelete({ isOpen: true, id: s.id, name: s.studentName })} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Xoá"><Trash2 className="w-4 h-4" /></button>
+                        <AppButton variant="danger-ghost" size="icon" onClick={() => setConfirmDelete({ isOpen: true, id: s.id, name: s.studentName })} title="Xoá" icon={<Trash2 className="w-4 h-4" />} />
                       </div>
                     </td>
                   </tr>
@@ -304,7 +301,7 @@ export default function ResultsPage() {
                   </td>
                   <td className="px-6 py-4 text-center text-xs text-slate-500">{formatDate(group.latestDate)}</td>
                   <td className="px-6 py-4 text-right">
-                    <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><Eye className="w-4 h-4" /></button>
+                    <AppButton variant="ghost" size="icon" className="hover:text-blue-600 hover:bg-blue-50 pointer-events-none" icon={<Eye className="w-4 h-4" />} />
                   </td>
                 </tr>
               ))}
@@ -315,8 +312,8 @@ export default function ResultsPage() {
           <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
             <p className="text-sm text-slate-500">Trang {data.meta.page} / {data.meta.totalPages} ({data.meta.total} nhóm)</p>
             <div className="flex gap-2">
-              <button onClick={() => setPage(page - 1)} disabled={page <= 1} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 hover:bg-white disabled:opacity-40 transition-all">Trước</button>
-              <button onClick={() => setPage(page + 1)} disabled={page >= data.meta.totalPages} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 hover:bg-white disabled:opacity-40 transition-all">Sau</button>
+              <AppButton variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>Trước</AppButton>
+              <AppButton variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= data.meta.totalPages}>Sau</AppButton>
             </div>
           </div>
         )}

@@ -5,6 +5,7 @@ import { useAuthStore } from '../../stores/auth.store';
 import { toast } from 'sonner';
 import { BookOpen, LogIn } from 'lucide-react';
 import AppInput from '../../components/AppInput';
+import AppButton from '../../components/AppButton';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -66,20 +67,16 @@ export default function LoginPage() {
               placeholder="••••••••"
             />
 
-            <button
+            <AppButton
               type="submit"
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-3 rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 transition-all shadow-md hover:shadow-lg"
+              isLoading={isLoading}
+              fullWidth
+              size="lg"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg"
+              icon={!isLoading && <LogIn className="w-4 h-4" />}
             >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <LogIn className="w-4 h-4" />
-                  Đăng nhập
-                </>
-              )}
-            </button>
+              Đăng nhập
+            </AppButton>
           </div>
         </form>
 

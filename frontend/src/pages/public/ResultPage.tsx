@@ -13,6 +13,7 @@ import {
   Eye,
 } from 'lucide-react';
 import type { ResultDetail } from '../../types/api.types';
+import AppButton from '../../components/AppButton';
 
 export default function ResultPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -116,9 +117,14 @@ export default function ResultPage() {
       {/* Review Section */}
       {review && review.length > 0 && (
         <div className="mt-8">
-          <button onClick={() => setShowReview(!showReview)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-blue-50 text-blue-700 hover:bg-blue-100 transition-all">
-            <Eye className="w-4 h-4" />{showReview ? 'Ẩn đáp án' : 'Xem đáp án chi tiết'}
-          </button>
+          <AppButton
+            onClick={() => setShowReview(!showReview)}
+            variant="outline"
+            className="border-none bg-blue-50 text-blue-700 hover:bg-blue-100"
+            icon={<Eye className="w-4 h-4" />}
+          >
+            {showReview ? 'Ẩn đáp án' : 'Xem đáp án chi tiết'}
+          </AppButton>
           {showReview && (
             <div className="mt-6 space-y-6">
               {review.map((item: any, idx: number) => {

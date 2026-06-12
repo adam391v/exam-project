@@ -19,6 +19,7 @@ import {
   Maximize,
 } from 'lucide-react';
 import AppInput from '../../components/AppInput';
+import AppButton from '../../components/AppButton';
 import type { ExamSessionStart, ExamAnswer } from '../../types/api.types';
 
 // ===== Types cho structured items =====
@@ -557,14 +558,16 @@ export default function TakeExamPage() {
             )}
             {/* Nút fullscreen */}
             {!isFullscreen && (
-              <button
+              <AppButton
+                size="sm"
+                variant="outline"
                 onClick={enterFullscreen}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-all"
+                className="bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                icon={<Maximize className="w-3.5 h-3.5" />}
                 title="Vào chế độ toàn màn hình"
               >
-                <Maximize className="w-3.5 h-3.5" />
                 Toàn màn hình
-              </button>
+              </AppButton>
             )}
             {/* Timer */}
             <div
@@ -593,31 +596,31 @@ export default function TakeExamPage() {
 
             {/* Navigation */}
             <div className="flex items-center justify-between mt-8 pt-6 border-t border-slate-100">
-              <button
+              <AppButton
+                variant="secondary"
                 onClick={() => goToItem(currentIndex - 1)}
                 disabled={currentIndex === 0}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                icon={<ChevronLeft className="w-4 h-4" />}
               >
-                <ChevronLeft className="w-4 h-4" />
                 Câu trước
-              </button>
+              </AppButton>
 
               {currentIndex === totalItems - 1 ? (
-                <button
+                <AppButton
                   onClick={() => setShowSubmitModal(true)}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md hover:shadow-lg transition-all"
+                  className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md hover:shadow-lg border-none"
+                  icon={<Send className="w-4 h-4" />}
                 >
-                  <Send className="w-4 h-4" />
                   Nộp bài
-                </button>
+                </AppButton>
               ) : (
-                <button
+                <AppButton
                   onClick={() => goToItem(currentIndex + 1)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-all"
+                  iconPosition="right"
+                  icon={<ChevronRight className="w-4 h-4" />}
                 >
                   Câu tiếp
-                  <ChevronRight className="w-4 h-4" />
-                </button>
+                </AppButton>
               )}
             </div>
           </div>
@@ -720,13 +723,15 @@ export default function TakeExamPage() {
             </div>
 
             {/* Submit */}
-            <button
+            <AppButton
+              fullWidth
+              size="lg"
               onClick={() => setShowSubmitModal(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md hover:shadow-lg transition-all"
+              className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-md hover:shadow-lg border-none"
+              icon={<Send className="w-4 h-4" />}
             >
-              <Send className="w-4 h-4" />
               Nộp bài
-            </button>
+            </AppButton>
           </div>
         </div>
       </div>
@@ -738,12 +743,7 @@ export default function TakeExamPage() {
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900">Xác nhận nộp bài</h3>
-                <button
-                  onClick={() => setShowSubmitModal(false)}
-                  className="p-1 text-slate-400 hover:text-slate-600"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <AppButton variant="ghost" size="icon" onClick={() => setShowSubmitModal(false)} className="text-slate-400 hover:text-slate-600 hover:bg-slate-100" icon={<X className="w-5 h-5" />} />
               </div>
 
               <div className="bg-slate-50 rounded-xl p-4 mb-6 space-y-2">
@@ -775,24 +775,18 @@ export default function TakeExamPage() {
               )}
 
               <div className="flex gap-3">
-                <button
-                  onClick={() => setShowSubmitModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all"
-                >
+                <AppButton variant="secondary" onClick={() => setShowSubmitModal(false)} fullWidth>
                   Quay lại
-                </button>
-                <button
+                </AppButton>
+                <AppButton
                   onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 transition-all"
+                  isLoading={isSubmitting}
+                  className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
+                  icon={!isSubmitting && <Check className="w-4 h-4" />}
+                  fullWidth
                 >
-                  {isSubmitting ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <Check className="w-4 h-4" />
-                  )}
                   Xác nhận nộp bài
-                </button>
+                </AppButton>
               </div>
             </div>
           </div>
@@ -824,16 +818,18 @@ export default function TakeExamPage() {
                 </p>
               </div>
 
-              <button
+              <AppButton
+                fullWidth
+                size="lg"
                 onClick={() => {
                   setShowViolationWarning(false);
                   enterFullscreen();
                 }}
-                className="w-full px-4 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md transition-all flex items-center justify-center gap-2"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-md border-none"
+                icon={<Maximize className="w-4 h-4" />}
               >
-                <Maximize className="w-4 h-4" />
                 Quay lại làm bài
-              </button>
+              </AppButton>
             </div>
           </div>
         </div>
@@ -854,17 +850,17 @@ export default function TakeExamPage() {
             Câu {currentIndex + 1}
             <span className="text-slate-400 font-normal"> / {totalItems}</span>
           </h2>
-          <button
+          <AppButton
+            size="sm"
+            variant="outline"
             onClick={() => handleToggleMark(item.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              answer?.isMarked
-                ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
-                : 'bg-slate-100 text-slate-500 hover:bg-yellow-50 hover:text-yellow-600'
-            }`}
+            className={answer?.isMarked
+                ? 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-100'
+                : 'bg-slate-100 text-slate-500 border-transparent hover:bg-yellow-50 hover:text-yellow-600'}
+            icon={<Flag className="w-4 h-4" />}
           >
-            <Flag className="w-4 h-4" />
             {answer?.isMarked ? 'Đã đánh dấu' : 'Đánh dấu'}
-          </button>
+          </AppButton>
         </div>
 
         {/* Nội dung */}
@@ -951,7 +947,9 @@ export default function TakeExamPage() {
               Câu hỏi chùm — {item.subQuestions.length} câu
             </span>
           </div>
-          <button
+          <AppButton
+            size="sm"
+            variant="outline"
             onClick={() => {
               // Toggle mark cho tất cả câu con
               const newMark = !isMarked;
@@ -962,15 +960,13 @@ export default function TakeExamPage() {
                 }
               });
             }}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              isMarked
-                ? 'bg-yellow-100 text-yellow-700 border border-yellow-300'
-                : 'bg-slate-100 text-slate-500 hover:bg-yellow-50 hover:text-yellow-600'
-            }`}
+            className={isMarked
+                ? 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-100'
+                : 'bg-slate-100 text-slate-500 border-transparent hover:bg-yellow-50 hover:text-yellow-600'}
+            icon={<Flag className="w-4 h-4" />}
           >
-            <Flag className="w-4 h-4" />
             {isMarked ? 'Đã đánh dấu' : 'Đánh dấu'}
-          </button>
+          </AppButton>
         </div>
 
         {/* Nội dung chung */}

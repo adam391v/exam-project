@@ -6,6 +6,7 @@ import { Plus, Pencil, Trash2, Search, BookOpen } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import AppModal from '../../components/AppModal';
 import AppInput from '../../components/AppInput';
+import AppButton from '../../components/AppButton';
 import type { Subject } from '../../types/api.types';
 
 export default function SubjectsPage() {
@@ -94,9 +95,9 @@ export default function SubjectsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Quản lý Môn học</h1>
           <p className="text-sm text-slate-500 mt-1">Thêm, sửa, xoá các môn học trong hệ thống</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all">
-          <Plus className="w-4 h-4" /> Thêm môn học
-        </button>
+        <AppButton onClick={openCreate} icon={<Plus className="w-4 h-4" />}>
+          Thêm môn học
+        </AppButton>
       </div>
 
       {/* Search */}
@@ -159,12 +160,8 @@ export default function SubjectsPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => openEdit(subject)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Sửa">
-                          <Pencil className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => handleDelete(subject.id, subject.name)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Xoá">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <AppButton variant="ghost" size="icon" onClick={() => openEdit(subject)} className="hover:text-blue-600 hover:bg-blue-50" title="Sửa" icon={<Pencil className="w-4 h-4" />} />
+                        <AppButton variant="danger-ghost" size="icon" onClick={() => handleDelete(subject.id, subject.name)} title="Xoá" icon={<Trash2 className="w-4 h-4" />} />
                       </div>
                     </td>
                   </tr>
@@ -181,20 +178,22 @@ export default function SubjectsPage() {
               Trang {data.meta.page} / {data.meta.totalPages} ({data.meta.total} môn)
             </p>
             <div className="flex gap-2">
-              <button
+              <AppButton
+                variant="outline"
+                size="sm"
                 onClick={() => setPage(page - 1)}
                 disabled={page <= 1}
-                className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 hover:bg-white disabled:opacity-40 transition-all"
               >
                 Trước
-              </button>
-              <button
+              </AppButton>
+              <AppButton
+                variant="outline"
+                size="sm"
                 onClick={() => setPage(page + 1)}
                 disabled={page >= data.meta.totalPages}
-                className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 hover:bg-white disabled:opacity-40 transition-all"
               >
                 Sau
-              </button>
+              </AppButton>
             </div>
           </div>
         )}
@@ -246,13 +245,12 @@ export default function SubjectsPage() {
                 </div>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">
+                <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>
                   Huỷ
-                </button>
-                <button type="submit" disabled={createMutation.isPending || updateMutation.isPending}
-                  className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">
+                </AppButton>
+                <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>
                   {editingSubject ? 'Cập nhật' : 'Tạo mới'}
-                </button>
+                </AppButton>
               </div>
             </form>
       </AppModal>

@@ -13,6 +13,7 @@ import {
   School,
 } from 'lucide-react';
 import { useState } from 'react';
+import AppButton from '../AppButton';
 
 const menuItems = [
   { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -54,12 +55,7 @@ export default function AdminLayout() {
               <h1 className="text-base font-bold text-slate-900">ExamOnline</h1>
               <p className="text-[10px] text-slate-400 -mt-0.5">Quản trị hệ thống</p>
             </div>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="lg:hidden ml-auto p-1 text-slate-400 hover:text-slate-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <AppButton variant="ghost" size="icon" onClick={() => setSidebarOpen(false)} className="lg:hidden ml-auto p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100" icon={<X className="w-5 h-5" />} />
           </div>
 
           {/* Navigation */}
@@ -97,13 +93,7 @@ export default function AdminLayout() {
                 <p className="text-sm font-medium text-slate-900 truncate">{user?.fullName}</p>
                 <p className="text-xs text-slate-500 truncate">{user?.role}</p>
               </div>
-              <button
-                onClick={handleLogout}
-                className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"
-                title="Đăng xuất"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
+              <AppButton variant="ghost" size="icon" onClick={handleLogout} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50" title="Đăng xuất" icon={<LogOut className="w-4 h-4" />} />
             </div>
           </div>
         </div>
@@ -121,12 +111,7 @@ export default function AdminLayout() {
       <div className="flex-1 flex flex-col min-h-screen lg:ml-0">
         {/* Top bar */}
         <header className="bg-white border-b border-slate-200 h-16 flex items-center px-4 lg:px-8 sticky top-0 z-30">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-slate-700"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
+          <AppButton variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100" icon={<Menu className="w-5 h-5" />} />
 
           <div className="flex items-center gap-2 text-sm text-slate-500 ml-2 lg:ml-0">
             <span>Quản trị</span>

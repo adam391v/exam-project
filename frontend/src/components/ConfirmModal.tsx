@@ -1,4 +1,5 @@
 import { AlertTriangle, X } from 'lucide-react';
+import AppButton from './AppButton';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -54,24 +55,17 @@ export default function ConfirmModal({
         </div>
 
         <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
-          >
+          <AppButton variant="secondary" onClick={onCancel}>
             {cancelText}
-          </button>
-          <button
+          </AppButton>
+          <AppButton 
+            variant={isDestructive ? 'danger' : 'primary'} 
             onClick={() => {
               onConfirm();
             }}
-            className={`px-4 py-2 text-sm font-medium text-white rounded-xl shadow-sm transition-colors ${
-              isDestructive 
-                ? 'bg-red-600 hover:bg-red-700 focus:ring-2 focus:ring-red-500 focus:ring-offset-2' 
-                : 'bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
-            }`}
           >
             {confirmText}
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>

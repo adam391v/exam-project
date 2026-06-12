@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, Search, Users } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import AppModal from '../../components/AppModal';
 import AppInput from '../../components/AppInput';
+import AppButton from '../../components/AppButton';
 
 export default function AdminUsersPage() {
   const queryClient = useQueryClient();
@@ -75,9 +76,9 @@ export default function AdminUsersPage() {
           <h1 className="text-2xl font-bold text-slate-900">Quản trị viên</h1>
           <p className="text-sm text-slate-500 mt-1">Quản lý tài khoản admin và giáo viên</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all">
-          <Plus className="w-4 h-4" /> Thêm tài khoản
-        </button>
+        <AppButton onClick={openCreate} icon={<Plus className="w-4 h-4" />}>
+          Thêm tài khoản
+        </AppButton>
       </div>
 
       <div className="max-w-sm">
@@ -124,8 +125,8 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => openEdit(user)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => setConfirmDelete({ isOpen: true, id: user.id, name: user.fullName })} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
+                      <AppButton variant="ghost" size="icon" onClick={() => openEdit(user)} className="hover:text-blue-600 hover:bg-blue-50" icon={<Pencil className="w-4 h-4" />} />
+                      <AppButton variant="danger-ghost" size="icon" onClick={() => setConfirmDelete({ isOpen: true, id: user.id, name: user.fullName })} icon={<Trash2 className="w-4 h-4" />} />
                     </div>
                   </td>
                 </tr>
@@ -137,8 +138,8 @@ export default function AdminUsersPage() {
           <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
             <p className="text-sm text-slate-500">Trang {data.meta.page} / {data.meta.totalPages}</p>
             <div className="flex gap-2">
-              <button onClick={() => setPage(page - 1)} disabled={page <= 1} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 hover:bg-white disabled:opacity-40 transition-all">Trước</button>
-              <button onClick={() => setPage(page + 1)} disabled={page >= data.meta.totalPages} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 hover:bg-white disabled:opacity-40 transition-all">Sau</button>
+              <AppButton variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>Trước</AppButton>
+              <AppButton variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= data.meta.totalPages}>Sau</AppButton>
             </div>
           </div>
         )}
@@ -203,8 +204,8 @@ export default function AdminUsersPage() {
                 </label>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
-                <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">{editingId ? 'Cập nhật' : 'Tạo mới'}</button>
+                <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>Huỷ</AppButton>
+                <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>{editingId ? 'Cập nhật' : 'Tạo mới'}</AppButton>
               </div>
             </form>
       </AppModal>

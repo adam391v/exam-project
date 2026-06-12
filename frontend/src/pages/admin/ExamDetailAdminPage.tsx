@@ -27,6 +27,7 @@ import {
 import ConfirmModal from '../../components/ConfirmModal';
 import AppModal from '../../components/AppModal';
 import AppInput from '../../components/AppInput';
+import AppButton from '../../components/AppButton';
 
 // ===== Interfaces =====
 interface QuestionOption {
@@ -367,17 +368,16 @@ export default function ExamDetailAdminPage() {
               <span className="flex items-center gap-1.5"><Globe className="w-4 h-4" />{totalQuestions} câu hỏi</span>
             </div>
           </div>
-          <button onClick={() => {
+          <AppButton onClick={() => {
             const url = `${window.location.origin}/exams/${exam.id}`;
             navigator.clipboard.writeText(url);
             toast.success('Đã copy link làm bài!');
             if (exam.status === 'DRAFT' && totalQuestions > 0) {
               publishMutation.mutate();
             }
-          }} disabled={publishMutation.isPending}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 shadow-sm transition-all">
-            <LinkIcon className="w-4 h-4" /> Xuất bản
-          </button>
+          }} disabled={publishMutation.isPending} className="bg-green-600 hover:bg-green-700 focus:ring-green-500" icon={<LinkIcon className="w-4 h-4" />}>
+            Xuất bản
+          </AppButton>
         </div>
       </div>
 
@@ -386,15 +386,15 @@ export default function ExamDetailAdminPage() {
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h2 className="text-base font-bold text-slate-900">Danh sách câu hỏi ({totalQuestions})</h2>
           <div className="flex gap-2">
-            <button onClick={() => setShowImportModal(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all">
-              <Upload className="w-3.5 h-3.5" /> Import Excel
-            </button>
-            <button onClick={openCreateGroup} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 transition-all">
-              <Layers className="w-3.5 h-3.5" /> Thêm câu chùm
-            </button>
-            <button onClick={openCreate} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all">
-              <Plus className="w-3.5 h-3.5" /> Thêm câu hỏi
-            </button>
+            <AppButton variant="outline" size="sm" onClick={() => setShowImportModal(true)} icon={<Upload className="w-3.5 h-3.5" />} className="border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100">
+              Import Excel
+            </AppButton>
+            <AppButton variant="purple" size="sm" onClick={openCreateGroup} icon={<Layers className="w-3.5 h-3.5" />}>
+              Thêm câu chùm
+            </AppButton>
+            <AppButton size="sm" onClick={openCreate} icon={<Plus className="w-3.5 h-3.5" />}>
+              Thêm câu hỏi
+            </AppButton>
           </div>
         </div>
 
@@ -495,13 +495,12 @@ export default function ExamDetailAdminPage() {
                 </div>
               )}
               <div className="flex gap-2 pt-2">
-                <button onClick={(e) => { e.stopPropagation(); openEdit(q); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all">
-                  <Pencil className="w-3.5 h-3.5" /> Sửa
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); setConfirmDelete({ isOpen: true, id: q.id, type: 'question' }); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-all">
-                  <Trash2 className="w-3.5 h-3.5" /> Xoá
-                </button>
+                <AppButton variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(q); }} icon={<Pencil className="w-3.5 h-3.5" />} className="border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100">
+                  Sửa
+                </AppButton>
+                <AppButton variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); setConfirmDelete({ isOpen: true, id: q.id, type: 'question' }); }} icon={<Trash2 className="w-3.5 h-3.5" />} className="border-red-200 text-red-600 bg-red-50 hover:bg-red-100">
+                  Xoá
+                </AppButton>
               </div>
             </div>
           </div>
@@ -528,12 +527,8 @@ export default function ExamDetailAdminPage() {
             <span className="text-xs text-purple-500 ml-2">({subCount} câu con)</span>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button onClick={(e) => { e.stopPropagation(); openEditGroup(g); }} className="p-1.5 text-purple-400 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-all">
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); setConfirmDelete({ isOpen: true, id: g.id, type: 'group' }); }} className="p-1.5 text-purple-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            <AppButton variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEditGroup(g); }} className="hover:text-purple-600 hover:bg-purple-100" icon={<Pencil className="w-3.5 h-3.5" />} />
+            <AppButton variant="danger-ghost" size="icon" onClick={(e) => { e.stopPropagation(); setConfirmDelete({ isOpen: true, id: g.id, type: 'group' }); }} icon={<Trash2 className="w-3.5 h-3.5" />} />
             {isExpanded ? <ChevronUp className="w-4 h-4 text-purple-400" /> : <ChevronDown className="w-4 h-4 text-purple-400" />}
           </div>
         </div>
@@ -646,15 +641,13 @@ export default function ExamDetailAdminPage() {
                         placeholder={`Đáp án đúng cho ô trống ${idx + 1}...`}
                       />
                       {form.correctAnswers.length > 1 && (
-                        <button type="button" onClick={() => {
-                          setForm({ ...form, correctAnswers: form.correctAnswers.filter((_, i) => i !== idx) });
-                        }} className="p-2 text-slate-400 hover:text-red-500"><X className="w-4 h-4" /></button>
+                        <AppButton type="button" variant="danger-ghost" size="icon" onClick={() => { setForm({ ...form, correctAnswers: form.correctAnswers.filter((_, i) => i !== idx) }); }} icon={<X className="w-4 h-4" />} />
                       )}
                     </div>
                   ))}
-                  <button type="button" onClick={() => setForm({ ...form, correctAnswers: [...form.correctAnswers, ''] })} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all w-fit">
-                    <Plus className="w-3.5 h-3.5" /> Thêm chỗ trống
-                  </button>
+                  <AppButton type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, correctAnswers: [...form.correctAnswers, ''] })} icon={<Plus className="w-3.5 h-3.5" />} className="border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 w-fit">
+                    Thêm chỗ trống
+                  </AppButton>
                 </div>
                 <p className="text-xs text-slate-400 mt-2">Hệ thống không phân biệt hoa/thường khi chấm. Mỗi ô trống yêu cầu nhập chính xác 1 đáp án (hỗ trợ nhiều ô trống trên 1 câu hỏi).</p>
               </div>
@@ -681,8 +674,8 @@ export default function ExamDetailAdminPage() {
               <RichTextEditor content={form.explanation} onChange={(html) => setForm({ ...form, explanation: html })} placeholder="Giải thích đáp án (không bắt buộc)" />
             </div>
             <div className="flex gap-3 pt-2">
-              <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
-              <button type="submit" disabled={addMutation.isPending || updateMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">{editingQuestionId ? 'Cập nhật' : 'Tạo mới'}</button>
+              <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>Huỷ</AppButton>
+              <AppButton type="submit" isLoading={addMutation.isPending || updateMutation.isPending} fullWidth>{editingQuestionId ? 'Cập nhật' : 'Tạo mới'}</AppButton>
             </div>
           </form>
       </AppModal>
@@ -741,9 +734,9 @@ export default function ExamDetailAdminPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-slate-800">Danh sách câu hỏi con ({groupForm.questions.length})</p>
-                <button type="button" onClick={addSubQuestion} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-purple-600 bg-purple-50 hover:bg-purple-100 transition-all">
-                  <Plus className="w-3.5 h-3.5" /> Thêm câu con
-                </button>
+                <AppButton type="button" variant="purple" size="sm" onClick={addSubQuestion} icon={<Plus className="w-3.5 h-3.5" />}>
+                  Thêm câu con
+                </AppButton>
               </div>
 
               {groupForm.questions.map((subQ, qIdx) => (
@@ -751,7 +744,7 @@ export default function ExamDetailAdminPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-bold text-slate-700">Câu {qIdx + 1}</span>
                     {groupForm.questions.length > 1 && (
-                      <button type="button" onClick={() => removeSubQuestion(qIdx)} className="p-1 text-slate-400 hover:text-red-600 transition-colors"><X className="w-4 h-4" /></button>
+                      <AppButton type="button" variant="danger-ghost" size="icon" onClick={() => removeSubQuestion(qIdx)} className="p-1" icon={<X className="w-4 h-4" />} />
                     )}
                   </div>
                   <div>
@@ -783,11 +776,10 @@ export default function ExamDetailAdminPage() {
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button type="button" onClick={closeGroupModal} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
-              <button type="submit" disabled={addGroupMutation.isPending || updateGroupMutation.isPending}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 transition-all">
+              <AppButton type="button" variant="secondary" onClick={closeGroupModal} fullWidth>Huỷ</AppButton>
+              <AppButton type="submit" variant="primary" className="bg-purple-600 hover:bg-purple-700 focus:ring-purple-500" isLoading={addGroupMutation.isPending || updateGroupMutation.isPending} fullWidth>
                 {editingGroupId ? 'Cập nhật' : 'Tạo nhóm'}
-              </button>
+              </AppButton>
             </div>
           </form>
       </AppModal>
@@ -816,10 +808,10 @@ export default function ExamDetailAdminPage() {
               <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
             </div>
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowImportModal(false)} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
-              <button onClick={handleImport} disabled={importMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">
-                {importMutation.isPending ? 'Đang import...' : 'Import'}
-              </button>
+              <AppButton type="button" variant="secondary" onClick={() => setShowImportModal(false)} fullWidth>Huỷ</AppButton>
+              <AppButton type="button" onClick={handleImport} isLoading={importMutation.isPending} fullWidth>
+                Import
+              </AppButton>
             </div>
           </div>
       </AppModal>

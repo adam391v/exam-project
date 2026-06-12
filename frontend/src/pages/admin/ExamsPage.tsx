@@ -9,6 +9,7 @@ import { Plus, Pencil, Trash2, Search, FileText, Eye, Link } from 'lucide-react'
 import ConfirmModal from '../../components/ConfirmModal';
 import AppModal from '../../components/AppModal';
 import AppInput from '../../components/AppInput';
+import AppButton from '../../components/AppButton';
 import type { Exam } from '../../types/api.types';
 
 export default function ExamsPage() {
@@ -116,9 +117,9 @@ export default function ExamsPage() {
           <h1 className="text-2xl font-bold text-slate-900">Quản lý Đề thi</h1>
           <p className="text-sm text-slate-500 mt-1">Tạo, chỉnh sửa và quản lý câu hỏi trong từng đề thi</p>
         </div>
-        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all">
-          <Plus className="w-4 h-4" /> Tạo đề thi
-        </button>
+        <AppButton onClick={openCreate} icon={<Plus className="w-4 h-4" />}>
+          Tạo đề thi
+        </AppButton>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
@@ -168,10 +169,10 @@ export default function ExamsPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => navigate(`/admin/exams/${exam.id}`)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
-                      <button onClick={(e) => { e.stopPropagation(); const url = `${window.location.origin}/exams/${exam.id}`; navigator.clipboard.writeText(url); toast.success('Đã copy link làm bài!'); if (exam.status === 'DRAFT') publishMutation.mutate(exam.id); }} className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all" title="Xuất bản & Copy link"><Link className="w-4 h-4" /></button>
-                      <button onClick={(e) => { e.stopPropagation(); openEdit(exam); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Sửa"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => setConfirmDelete({ isOpen: true, id: exam.id, name: exam.title })} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Xoá"><Trash2 className="w-4 h-4" /></button>
+                      <AppButton variant="ghost" size="icon" onClick={() => navigate(`/admin/exams/${exam.id}`)} className="hover:text-blue-600 hover:bg-blue-50" title="Xem chi tiết" icon={<Eye className="w-4 h-4" />} />
+                      <AppButton variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); const url = `${window.location.origin}/exams/${exam.id}`; navigator.clipboard.writeText(url); toast.success('Đã copy link làm bài!'); if (exam.status === 'DRAFT') publishMutation.mutate(exam.id); }} className="hover:text-green-600 hover:bg-green-50" title="Xuất bản & Copy link" icon={<Link className="w-4 h-4" />} />
+                      <AppButton variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openEdit(exam); }} className="hover:text-blue-600 hover:bg-blue-50" title="Sửa" icon={<Pencil className="w-4 h-4" />} />
+                      <AppButton variant="danger-ghost" size="icon" onClick={() => setConfirmDelete({ isOpen: true, id: exam.id, name: exam.title })} title="Xoá" icon={<Trash2 className="w-4 h-4" />} />
                     </div>
                   </td>
                 </tr>
@@ -183,8 +184,8 @@ export default function ExamsPage() {
           <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50">
             <p className="text-sm text-slate-500">Trang {data.meta.page} / {data.meta.totalPages}</p>
             <div className="flex gap-2">
-              <button onClick={() => setPage(page - 1)} disabled={page <= 1} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 hover:bg-white disabled:opacity-40 transition-all">Trước</button>
-              <button onClick={() => setPage(page + 1)} disabled={page >= data.meta.totalPages} className="px-3 py-1.5 rounded-lg text-sm border border-slate-300 hover:bg-white disabled:opacity-40 transition-all">Sau</button>
+              <AppButton variant="outline" size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>Trước</AppButton>
+              <AppButton variant="outline" size="sm" onClick={() => setPage(page + 1)} disabled={page >= data.meta.totalPages}>Sau</AppButton>
             </div>
           </div>
         )}
@@ -262,8 +263,8 @@ export default function ExamsPage() {
                 <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.shuffleOptions} onChange={(e) => setForm({ ...form, shuffleOptions: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-slate-700">Trộn đáp án</span></label>
               </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
-                <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">{editingExam ? 'Cập nhật' : 'Tạo mới'}</button>
+                <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>Huỷ</AppButton>
+                <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>{editingExam ? 'Cập nhật' : 'Tạo mới'}</AppButton>
               </div>
             </form>
       </AppModal>

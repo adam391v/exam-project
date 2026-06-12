@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Upload, X, Loader2 } from 'lucide-react';
 import { uploadService } from '../services/data.service';
 import { toast } from 'sonner';
+import AppButton from './AppButton';
 
 interface FileUploadInputProps {
   /** Loại file: 'image' hoặc 'audio' */
@@ -70,28 +71,25 @@ export default function FileUploadInput({ type, value, onChange, placeholder }: 
           className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           placeholder={placeholder || `URL ${LABEL_MAP[type]} hoặc upload file...`}
         />
-        <button
-          type="button"
+        <AppButton
+          variant="outline"
+          size="sm"
           onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 disabled:opacity-50 transition-all border border-blue-200 flex-shrink-0"
+          isLoading={isUploading}
+          icon={!isUploading && <Upload className="w-3.5 h-3.5" />}
+          className="border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 flex-shrink-0"
         >
-          {isUploading ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Upload className="w-3.5 h-3.5" />
-          )}
           Upload
-        </button>
+        </AppButton>
         {value && (
-          <button
-            type="button"
+          <AppButton
+            variant="danger-ghost"
+            size="icon"
             onClick={handleClear}
-            className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0"
             title="Xoá"
-          >
-            <X className="w-4 h-4" />
-          </button>
+            icon={<X className="w-4 h-4" />}
+            className="flex-shrink-0"
+          />
         )}
       </div>
 
