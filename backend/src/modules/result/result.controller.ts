@@ -28,11 +28,13 @@ export class ResultController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
+    @Query('studentClass') studentClass?: string,
   ) {
     return this.resultService.findGroupedByClass({
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 20,
       search,
+      studentClass,
     });
   }
 

@@ -48,6 +48,14 @@ export class ExamSessionService {
       throw new NotFoundException('Đề thi không tồn tại hoặc chưa được công khai');
     }
 
+    const now = new Date();
+    if (exam.startTime && now < exam.startTime) {
+      throw new ForbiddenException('Đề thi chưa tới giờ mở');
+    }
+    if (exam.endTime && now > exam.endTime) {
+      throw new ForbiddenException('Đề thi đã đóng');
+    }
+
     // Xác định studentClass
     let studentClass = dto.studentClass || '';
     let classroomId: string | null = null;

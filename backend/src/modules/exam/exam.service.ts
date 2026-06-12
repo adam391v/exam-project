@@ -40,6 +40,8 @@ export class ExamService {
         duration: true,
         totalQuestions: true,
         description: true,
+        startTime: true,
+        endTime: true,
         subject: { select: { id: true, name: true, code: true } },
         _count: { select: { examSessions: true } },
       },
@@ -57,6 +59,8 @@ export class ExamService {
         totalQuestions: true,
         description: true,
         showAnswer: true,
+        startTime: true,
+        endTime: true,
         subject: { select: { id: true, name: true, code: true } },
       },
     });

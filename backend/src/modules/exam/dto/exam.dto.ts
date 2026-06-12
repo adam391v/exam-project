@@ -9,6 +9,7 @@ import {
   IsArray,
   ValidateNested,
   Min,
+  IsDate,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ExamStatus } from '@prisma/client';
@@ -52,6 +53,16 @@ export class CreateExamDto {
   @Type(() => Number)
   @IsNumber()
   passingScore?: number;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  startTime?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  endTime?: Date;
 }
 
 export class UpdateExamDto {
@@ -97,6 +108,16 @@ export class UpdateExamDto {
   @Type(() => Number)
   @IsNumber()
   passingScore?: number;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  startTime?: Date;
+
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  endTime?: Date;
 }
 
 // ===== Question DTOs (thuộc trực tiếp vào Exam) =====

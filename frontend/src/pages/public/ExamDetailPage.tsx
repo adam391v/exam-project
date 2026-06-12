@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { examService, examSessionService, classroomService } from '../../services/data.service';
@@ -67,6 +67,14 @@ export default function ExamDetailPage() {
     }
   };
 
+  const [now, setNow] = useState(new Date());
+
+  useEffect(() => {
+    if (!exam) return;
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, [exam]);
+
   if (isLoading) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16">
@@ -86,6 +94,29 @@ export default function ExamDetailPage() {
         <h2 className="text-xl font-semibold text-slate-600">Không tìm thấy đề thi</h2>
       </div>
     );
+  }
+
+  const startTime = exam.startTime ? new Date(exam.startTime) : null;
+  const endTime = exam.endTime ? new Date(exam.endTime) : null;
+  const isBeforeStart = startTime && now < startTime;
+  const isAfterEnd = endTime && now > endTime;
+  const isTimeValid = !isBeforeStart && !isAfterEnd;
+
+  let countdownText = 'Chưa tới giờ mở đề';
+  if (isBeforeStart && startTime) {
+    const diff = startTime.getTime() - now.getTime();
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const secs = Math.floor((diff % (1000 * 60)) / 1000);
+    
+    const pad = (n: number) => String(n).padStart(2, '0');
+    
+    if (hours > 24) {
+      const days = Math.floor(hours / 24);
+      countdownText = `Bài thi sẽ bắt đầu sau ${days} ngày ${pad(hours % 24)}:${pad(mins)}:${pad(secs)}`;
+    } else {
+      countdownText = `Bài thi sẽ bắt đầu sau ${pad(hours)}:${pad(mins)}:${pad(secs)}`;
+    }
   }
 
   return (
@@ -141,6 +172,28 @@ export default function ExamDetailPage() {
               <p className="text-sm font-semibold text-slate-900">{exam.showAnswer ? 'Có' : 'Không'}</p>
             </div>
           </div>
+          {exam.startTime && (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                <Clock className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Mở đề</p>
+                <p className="text-sm font-semibold text-slate-900">{new Date(exam.startTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+              </div>
+            </div>
+          )}
+          {exam.endTime && (
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                <Clock className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500">Đóng đề</p>
+                <p className="text-sm font-semibold text-slate-900">{new Date(exam.endTime).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Form nhập thông tin */}
@@ -200,14 +253,22 @@ export default function ExamDetailPage() {
 
             <button
               onClick={handleStartExam}
-              disabled={isStarting || !studentName.trim() || !selectedClassroomId}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold py-3.5 rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+              disabled={isStarting || !studentName.trim() || !selectedClassroomId || !isTimeValid}
+              className={`w-full font-semibold py-3.5 rounded-xl transition-all duration-200 shadow-md flex items-center justify-center gap-2 ${
+                !isTimeValid 
+                  ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 hover:shadow-lg disabled:opacity-50'
+              }`}
             >
               {isStarting ? (
                 <>
                   <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   Đang khởi tạo...
                 </>
+              ) : isBeforeStart ? (
+                countdownText
+              ) : isAfterEnd ? (
+                'Đã quá thời gian làm bài'
               ) : (
                 'Bắt đầu làm bài'
               )}

@@ -1,8 +1,16 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { adminResultService } from '../../services/data.service';
+import { adminResultService, classroomService } from '../../services/data.service';
 import { toast } from 'sonner';
-import { Search, Trash2, Eye, ClipboardList, ArrowLeft, Users, Clock } from 'lucide-react';
+import { Search, Trash2, Eye, ClipboardList, ArrowLeft, Users, Clock, Download } from 'lucide-react';
+import AppSelect from '../../components/AppSelect';
+import * as XLSX from 'xlsx';
+
+// Options khối 1-12
+const gradeOptions = Array.from({ length: 12 }, (_, i) => ({
+  value: String(i + 1),
+  label: `Khối ${i + 1}`,
+}));
 
 // Format thời gian làm bài
 const formatTimeTaken = (seconds?: number) => {
@@ -14,7 +22,18 @@ const formatTimeTaken = (seconds?: number) => {
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '-';
-  return new Date(dateStr).toLocaleString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const d = new Date(dateStr);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return (
+    <div className="flex flex-col items-center">
+      <span className="font-medium text-slate-600">{day}/{month}/{year}</span>
+      <span className="text-[11px] text-slate-400 mt-0.5">lúc {hours}:{minutes}</span>
+    </div>
+  );
 };
 
 export default function ResultsPage() {
@@ -24,10 +43,28 @@ export default function ResultsPage() {
   // Chi tiết lớp
   const [classDetail, setClassDetail] = useState<{ studentClass: string; examId: string; examTitle: string; subjectName: string } | null>(null);
 
+  // Lọc theo lớp
+  const [selectedGrade, setSelectedGrade] = useState<number | null>(null);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
+
+  const { data: classrooms = [], isLoading: isLoadingClassrooms } = useQuery({
+    queryKey: ['classrooms-by-grade', selectedGrade],
+    queryFn: () => classroomService.getByGrade(selectedGrade!),
+    enabled: !!selectedGrade,
+  });
+
+  const classroomOptions = useMemo(() =>
+    Array.isArray(classrooms) ? classrooms.map((c: any) => ({ value: c.id, label: c.name })) : [],
+    [classrooms],
+  );
+
+  const selectedClassroom = classroomOptions.find((o: any) => o.value === selectedClassroomId) || null;
+  const studentClassParam = selectedClassroom?.label || undefined;
+
   // API nhóm theo lớp
   const { data, isLoading } = useQuery({
-    queryKey: ['admin-results-grouped', page, search],
-    queryFn: () => adminResultService.getAll({ page, limit: 20, search: search || undefined }),
+    queryKey: ['admin-results-grouped', page, search, studentClassParam],
+    queryFn: () => adminResultService.getAll({ page, limit: 20, search: search || undefined, studentClass: studentClassParam }),
     enabled: !classDetail,
   });
 
@@ -57,14 +94,44 @@ export default function ResultsPage() {
     });
   };
 
+  const exportExcel = () => {
+    if (!detailData || !Array.isArray(detailData)) return;
+
+    const exportData = detailData.map((s: any, index: number) => ({
+      'STT': index + 1,
+      'Họ và tên': s.studentName,
+      'Lớp': s.studentClass,
+      'Điểm': s.result?.score ?? '-',
+      'Đúng / Tổng': s.result ? `${s.result.correctAnswers}/${s.result.totalQuestions}` : '-',
+      'Thời gian làm bài': s.result?.timeTaken ? `${Math.floor(s.result.timeTaken / 60)} phút ${s.result.timeTaken % 60} giây` : '-',
+      'Số lần chuyển tab': s.tabSwitchCount ?? 0,
+      'Thời gian nộp': s.submittedAt ? new Date(s.submittedAt).toLocaleString('vi-VN') : '-',
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'KetQua');
+
+    const fileName = `Bang_Diem_${classDetail?.studentClass}_${classDetail?.examTitle}.xlsx`.replace(/\s+/g, '_');
+    XLSX.writeFile(workbook, fileName);
+  };
+
   // ============ VIEW: Chi tiết lớp ============
   if (classDetail) {
     const students = Array.isArray(detailData) ? detailData : [];
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between">
           <button onClick={() => setClassDetail(null)} className="flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 transition-colors">
             <ArrowLeft className="w-4 h-4" /> Quay lại
+          </button>
+
+          <button
+            onClick={exportExcel}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl transition-colors shadow-sm"
+          >
+            <Download className="w-4 h-4" />
+            Xuất Excel
           </button>
         </div>
         <div>
@@ -100,11 +167,10 @@ export default function ResultsPage() {
                       <p className="font-medium text-slate-900">{s.studentName}</p>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-sm font-bold ${
-                        (s.result?.score || 0) >= 7 ? 'bg-green-100 text-green-700' :
-                        (s.result?.score || 0) >= 5 ? 'bg-orange-100 text-orange-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
+                      <span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-sm font-bold ${(s.result?.score || 0) >= 7 ? 'bg-green-100 text-green-700' :
+                          (s.result?.score || 0) >= 5 ? 'bg-orange-100 text-orange-700' :
+                            'bg-red-100 text-red-700'
+                        }`}>
                         {s.result?.score ?? '-'}
                       </span>
                     </td>
@@ -142,10 +208,43 @@ export default function ResultsPage() {
         <p className="text-sm text-slate-500 mt-1">Kết quả theo lớp học — click vào để xem chi tiết</p>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input type="text" placeholder="Tìm theo lớp, đề thi, môn..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-1 gap-4">
+          <div className="w-36">
+            <AppSelect
+              value={selectedGrade ? gradeOptions.find(o => o.value === String(selectedGrade)) || null : null}
+              onChange={(opt) => {
+                setSelectedGrade(opt ? Number(opt.value) : null);
+                setSelectedClassroomId(null);
+                setPage(1);
+              }}
+              options={gradeOptions}
+              placeholder="Chọn khối..."
+              isSearchable={false}
+            />
+          </div>
+          <div className="w-48">
+            <AppSelect
+              value={selectedClassroom}
+              onChange={(opt) => {
+                setSelectedClassroomId(opt?.value || null);
+                setPage(1);
+              }}
+              options={classroomOptions}
+              placeholder={selectedGrade ? (isLoadingClassrooms ? 'Đang tải...' : 'Lọc theo lớp...') : 'Chọn khối trước'}
+              isDisabled={!selectedGrade || isLoadingClassrooms}
+              isLoading={isLoadingClassrooms}
+              noOptionsMessage={() => 'Không có lớp'}
+              isClearable
+            />
+          </div>
+        </div>
+
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input type="text" placeholder="Tìm theo lớp, đề thi, môn..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -189,11 +288,10 @@ export default function ResultsPage() {
                     <span className="text-slate-400 ml-1 text-xs">HS</span>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-sm font-bold ${
-                      group.avgScore >= 7 ? 'bg-green-100 text-green-700' :
-                      group.avgScore >= 5 ? 'bg-orange-100 text-orange-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
+                    <span className={`inline-flex items-center justify-center w-10 h-10 rounded-xl text-sm font-bold ${group.avgScore >= 7 ? 'bg-green-100 text-green-700' :
+                        group.avgScore >= 5 ? 'bg-orange-100 text-orange-700' :
+                          'bg-red-100 text-red-700'
+                      }`}>
                       {group.avgScore}
                     </span>
                   </td>

@@ -22,6 +22,7 @@ import {
   FileText,
   GripVertical,
   Layers,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 // ===== Interfaces =====
@@ -362,12 +363,17 @@ export default function ExamDetailAdminPage() {
               <span className="flex items-center gap-1.5"><Globe className="w-4 h-4" />{totalQuestions} câu hỏi</span>
             </div>
           </div>
-          {exam.status !== 'PUBLISHED' && (
-            <button onClick={() => publishMutation.mutate()} disabled={publishMutation.isPending || totalQuestions === 0}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 shadow-sm transition-all">
-              <Globe className="w-4 h-4" /> Công khai
-            </button>
-          )}
+          <button onClick={() => {
+            const url = `${window.location.origin}/exams/${exam.id}`;
+            navigator.clipboard.writeText(url);
+            toast.success('Đã copy link làm bài!');
+            if (exam.status === 'DRAFT' && totalQuestions > 0) {
+              publishMutation.mutate();
+            }
+          }} disabled={publishMutation.isPending}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-40 shadow-sm transition-all">
+            <LinkIcon className="w-4 h-4" /> Xuất bản
+          </button>
         </div>
       </div>
 

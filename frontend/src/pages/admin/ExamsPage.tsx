@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import AppSelect from '../../components/AppSelect';
+import AppDatePicker from '../../components/AppDatePicker';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { adminExamService, adminSubjectService } from '../../services/data.service';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Search, X, FileText, CheckCircle, Eye } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, X, FileText, CheckCircle, Eye, Link } from 'lucide-react';
 import type { Exam } from '../../types/api.types';
 
 export default function ExamsPage() {
@@ -17,6 +18,7 @@ export default function ExamsPage() {
   const [form, setForm] = useState({
     title: '', subjectId: '', duration: 30, description: '', isPublic: false,
     showAnswer: true, shuffleQuestions: false, shuffleOptions: false, passingScore: 5,
+    startTime: '', endTime: ''
   });
 
   const { data, isLoading } = useQuery({
@@ -62,7 +64,7 @@ export default function ExamsPage() {
 
   const openCreate = () => {
     setEditingExam(null);
-    setForm({ title: '', subjectId: '', duration: 30, description: '', isPublic: false, showAnswer: true, shuffleQuestions: false, shuffleOptions: false, passingScore: 5 });
+    setForm({ title: '', subjectId: '', duration: 30, description: '', isPublic: false, showAnswer: true, shuffleQuestions: false, shuffleOptions: false, passingScore: 5, startTime: '', endTime: '' });
     setShowModal(true);
   };
 
@@ -71,7 +73,9 @@ export default function ExamsPage() {
     setForm({
       title: exam.title, subjectId: exam.subject?.id || '', duration: exam.duration,
       description: exam.description || '', isPublic: exam.isPublic, showAnswer: exam.showAnswer,
-      shuffleQuestions: false, shuffleOptions: false, passingScore: 5,
+      shuffleQuestions: exam.shuffleQuestions || false, shuffleOptions: exam.shuffleOptions || false, passingScore: exam.passingScore || 5,
+      startTime: exam.startTime ? new Date(exam.startTime).toISOString() : '',
+      endTime: exam.endTime ? new Date(exam.endTime).toISOString() : '',
     });
     setShowModal(true);
   };
@@ -80,8 +84,13 @@ export default function ExamsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingExam) { updateMutation.mutate({ id: editingExam.id, dto: form }); }
-    else { createMutation.mutate(form); }
+    const payload = {
+      ...form,
+      startTime: form.startTime || null,
+      endTime: form.endTime || null,
+    };
+    if (editingExam) { updateMutation.mutate({ id: editingExam.id, dto: payload }); }
+    else { createMutation.mutate(payload); }
   };
 
   const statusColors: Record<string, string> = {
@@ -150,7 +159,7 @@ export default function ExamsPage() {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => navigate(`/admin/exams/${exam.id}`)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
-                      {exam.status === 'DRAFT' && <button onClick={() => publishMutation.mutate(exam.id)} className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all" title="Công khai"><CheckCircle className="w-4 h-4" /></button>}
+                      <button onClick={(e) => { e.stopPropagation(); const url = `${window.location.origin}/exams/${exam.id}`; navigator.clipboard.writeText(url); toast.success('Đã copy link làm bài!'); if (exam.status === 'DRAFT') publishMutation.mutate(exam.id); }} className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all" title="Xuất bản & Copy link"><Link className="w-4 h-4" /></button>
                       <button onClick={(e) => { e.stopPropagation(); openEdit(exam); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Sửa"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => { if (window.confirm('Xoá đề thi?')) deleteMutation.mutate(exam.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Xoá"><Trash2 className="w-4 h-4" /></button>
                     </div>
@@ -202,6 +211,24 @@ export default function ExamsPage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Điểm đạt</label>
                   <input type="number" min={0} max={10} step={0.5} value={form.passingScore} onChange={(e) => setForm({ ...form, passingScore: parseFloat(e.target.value) || 5 })} className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Thời gian mở đề</label>
+                  <AppDatePicker
+                    value={form.startTime}
+                    onChange={(date) => setForm({ ...form, startTime: date ? date.toISOString() : '' })}
+                    placeholder="Chọn thời gian mở đề..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Thời gian đóng đề</label>
+                  <AppDatePicker
+                    value={form.endTime}
+                    onChange={(date) => setForm({ ...form, endTime: date ? date.toISOString() : '' })}
+                    placeholder="Chọn thời gian đóng đề..."
+                  />
                 </div>
               </div>
               <div>

@@ -127,15 +127,19 @@ export class ResultService {
     page?: number;
     limit?: number;
     search?: string;
+    studentClass?: string;
   }) {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
-    const { search } = query;
+    const { search, studentClass } = query;
     const skip = (page - 1) * limit;
 
     const where: any = {
       result: { isNot: null },
     };
+    if (studentClass) {
+      where.studentClass = studentClass;
+    }
     if (search) {
       where.OR = [
         { studentClass: { contains: search, mode: 'insensitive' } },

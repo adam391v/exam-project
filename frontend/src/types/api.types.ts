@@ -67,6 +67,8 @@ export interface Exam {
   isPublic: boolean;
   showAnswer: boolean;
   description?: string;
+  startTime?: string;
+  endTime?: string;
   subject: { id: string; name: string; code: string };
   _count?: { examQuestions: number; examSessions: number };
 }
