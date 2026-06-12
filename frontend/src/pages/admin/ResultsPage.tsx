@@ -196,6 +196,19 @@ export default function ResultsPage() {
             </table>
           </div>
         </div>
+
+        <ConfirmModal
+          isOpen={!!confirmDelete?.isOpen}
+          title="Xác nhận xoá kết quả"
+          message={`Bạn có chắc chắn muốn xoá bài thi của học sinh "${confirmDelete?.name}"? Hành động này không thể hoàn tác.`}
+          onConfirm={() => {
+            if (confirmDelete?.id) {
+              deleteMutation.mutate(confirmDelete.id);
+              setConfirmDelete(null);
+            }
+          }}
+          onCancel={() => setConfirmDelete(null)}
+        />
       </div>
     );
   }

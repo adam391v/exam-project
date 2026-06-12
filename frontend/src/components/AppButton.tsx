@@ -1,4 +1,5 @@
-import { forwardRef, ButtonHTMLAttributes, ReactNode } from 'react';
+import { forwardRef } from 'react';
+import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'outline' | 'ghost' | 'purple' | 'danger-ghost';
@@ -10,6 +11,7 @@ interface AppButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   isLoading?: boolean;
   fullWidth?: boolean;
   icon?: ReactNode;
+  iconPosition?: 'left' | 'right';
 }
 
 const AppButton = forwardRef<HTMLButtonElement, AppButtonProps>(({
@@ -19,6 +21,7 @@ const AppButton = forwardRef<HTMLButtonElement, AppButtonProps>(({
   isLoading = false,
   fullWidth = false,
   icon,
+  iconPosition = 'left',
   className = '',
   disabled,
   ...props
@@ -52,6 +55,16 @@ const AppButton = forwardRef<HTMLButtonElement, AppButtonProps>(({
   // Width class
   const widthClass = fullWidth ? 'w-full' : '';
 
+  const renderIcon = () => {
+    if (isLoading) {
+      return <Loader2 className={`animate-spin ${size === 'sm' || size === 'icon' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />;
+    }
+    if (icon) {
+      return <span className="flex-shrink-0 flex items-center justify-center">{icon}</span>;
+    }
+    return null;
+  };
+
   return (
     <button
       ref={ref}
@@ -66,13 +79,9 @@ const AppButton = forwardRef<HTMLButtonElement, AppButtonProps>(({
       `}
       {...props}
     >
-      {isLoading ? (
-        <Loader2 className={`animate-spin ${size === 'sm' || size === 'icon' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
-      ) : icon ? (
-        <span className="flex-shrink-0 flex items-center justify-center">{icon}</span>
-      ) : null}
-      
+      {iconPosition === 'left' && renderIcon()}
       {children}
+      {iconPosition === 'right' && renderIcon()}
     </button>
   );
 });

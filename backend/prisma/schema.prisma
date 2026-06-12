@@ -184,7 +184,7 @@ model ExamSession {
   userAgent      String?       @map("user_agent")
   createdAt      DateTime      @default(now()) @map("created_at")
 
-  exam      Exam         @relation(fields: [examId], references: [id])
+  exam      Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
   classroom Classroom?   @relation(fields: [classroomId], references: [id])
   answers   ExamAnswer[]
   result    ExamResult?
@@ -224,7 +224,7 @@ model ExamResult {
   isPassed       Boolean? @map("is_passed")
   createdAt      DateTime @default(now()) @map("created_at")
 
-  session ExamSession @relation(fields: [sessionId], references: [id])
+  session ExamSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@map("exam_results")
 }
