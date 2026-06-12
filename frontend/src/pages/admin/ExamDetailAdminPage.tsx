@@ -1,4 +1,8 @@
 import { useState, useRef } from 'react';
+import { useForm, Controller } from 'react-hook-form';
+import type { SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import RichTextEditor from '../../components/RichTextEditor';
 import HtmlContent from '../../components/HtmlContent';
 import FileUploadInput from '../../components/FileUploadInput';
@@ -30,60 +34,51 @@ import AppInput from '../../components/AppInput';
 import AppButton from '../../components/AppButton';
 
 // ===== Interfaces =====
-interface QuestionOption {
-  id?: string;
-  label: string;
-  content: string;
-  isCorrect: boolean;
-  sortOrder?: number;
-}
+const optionSchema = z.object({ id: z.string().optional(), label: z.string(), content: z.string(), isCorrect: z.boolean(), sortOrder: z.number().optional() });
+const questionSchema = z.object({
+  content: z.string().min(1, 'Nội dung không được rỗng'), type: z.string(), imageUrl: z.string().optional(), audioUrl: z.string().optional(), youtubeUrl: z.string().optional(), explanation: z.string().optional(),
+  options: z.array(optionSchema).optional(), correctAnswers: z.array(z.string()).optional()
+}).superRefine((data, ctx) => {
+  if (data.type === 'FILL_IN_BLANK') {
+    if (!data.correctAnswers || data.correctAnswers.filter(a => a.trim()).length === 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Phải nhập ít nhất 1 đáp án đúng', path: ['correctAnswers'] });
+    }
+  } else {
+    if (!data.options || !data.options.some(o => o.isCorrect)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Phải chọn ít nhất 1 đáp án đúng', path: ['options'] });
+    }
+  }
+});
+const subQuestionSchema = z.object({
+  content: z.string().min(1, 'Nội dung không được rỗng'), type: z.string(), explanation: z.string().optional(),
+  options: z.array(optionSchema).refine(opts => opts.some(o => o.isCorrect), 'Phải chọn ít nhất 1 đáp án đúng')
+});
+const groupSchema = z.object({
+  title: z.string().optional(), content: z.string().min(1, 'Nội dung chung không được rỗng'), imageUrl: z.string().optional(), audioUrl: z.string().optional(), youtubeUrl: z.string().optional(),
+  questions: z.array(subQuestionSchema).min(1, 'Phải có ít nhất 1 câu hỏi con')
+});
+type QuestionFormValues = z.infer<typeof questionSchema>;
+type GroupFormValues = z.infer<typeof groupSchema>;
 
-interface QuestionForm {
-  content: string;
-  imageUrl: string;
-  audioUrl: string;
-  youtubeUrl: string;
-  explanation: string;
-  type: string;
-  options: QuestionOption[];
-  correctAnswers: string[];
-}
-
-interface SubQuestionForm {
-  content: string;
-  explanation: string;
-  type: string;
-  options: QuestionOption[];
-}
-
-interface GroupForm {
-  title: string;
-  content: string;
-  imageUrl: string;
-  audioUrl: string;
-  youtubeUrl: string;
-  questions: SubQuestionForm[];
-}
-
-const defaultOptions: QuestionOption[] = [
+const defaultOptions = [
   { label: 'A', content: '', isCorrect: false },
   { label: 'B', content: '', isCorrect: false },
   { label: 'C', content: '', isCorrect: false },
   { label: 'D', content: '', isCorrect: false },
 ];
 
-const defaultForm: QuestionForm = {
+const defaultForm: QuestionFormValues = {
   content: '', imageUrl: '', audioUrl: '', youtubeUrl: '', explanation: '', type: 'SINGLE_CHOICE',
   options: defaultOptions.map(o => ({ ...o })),
   correctAnswers: [''],
 };
 
-const defaultSubQuestion: SubQuestionForm = {
+const defaultSubQuestion = {
   content: '', explanation: '', type: 'SINGLE_CHOICE',
   options: defaultOptions.map(o => ({ ...o })),
 };
 
-const defaultGroupForm: GroupForm = {
+const defaultGroupForm: GroupFormValues = {
   title: '', content: '', imageUrl: '', audioUrl: '', youtubeUrl: '',
   questions: [{ ...defaultSubQuestion, options: defaultOptions.map(o => ({ ...o })) }],
 };
@@ -101,8 +96,9 @@ export default function ExamDetailAdminPage() {
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; type: 'question' | 'group' } | null>(null);
-  const [form, setForm] = useState<QuestionForm>({ ...defaultForm });
-  const [groupForm, setGroupForm] = useState<GroupForm>({ ...defaultGroupForm });
+  const { control: qControl, handleSubmit: handleQSubmit, reset: resetQ, formState: { errors: qErrors }, watch: watchQ } = useForm<QuestionFormValues>({ resolver: zodResolver(questionSchema), defaultValues: defaultForm });
+  const { control: gControl, handleSubmit: handleGSubmit, reset: resetG, formState: { errors: gErrors } } = useForm<GroupFormValues>({ resolver: zodResolver(groupSchema), defaultValues: defaultGroupForm });
+  const qType = watchQ('type');
 
   // Lấy chi tiết đề thi + câu hỏi
   const { data: exam, isLoading } = useQuery({
@@ -169,14 +165,14 @@ export default function ExamDetailAdminPage() {
   // === Handlers: Câu đơn ===
   const openCreate = () => {
     setEditingQuestionId(null);
-    setForm({ ...defaultForm, options: defaultOptions.map(o => ({ ...o })) });
+    resetQ({ ...defaultForm, options: defaultOptions.map(o => ({ ...o })) });
     setShowQuestionModal(true);
   };
 
   const openEdit = (q: any) => {
     setEditingQuestionId(q.id);
     const isFillInBlank = q.type === 'FILL_IN_BLANK';
-    setForm({
+    resetQ({
       content: q.content, imageUrl: q.imageUrl || '', audioUrl: q.audioUrl || '', youtubeUrl: q.youtubeUrl || '',
       explanation: q.explanation || '', type: q.type,
       options: isFillInBlank ? [] : (q.options?.map((o: any) => ({ label: o.label, content: o.content, isCorrect: o.isCorrect })) || []),
@@ -187,35 +183,23 @@ export default function ExamDetailAdminPage() {
 
   const closeModal = () => { setShowQuestionModal(false); setEditingQuestionId(null); };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (form.type === 'FILL_IN_BLANK') {
-      const answers = form.correctAnswers.map(a => a.trim()).filter(a => a);
-      if (answers.length === 0) { toast.error('Phải nhập ít nhất 1 đáp án đúng'); return; }
-      const dto = { ...form, correctAnswers: answers, options: undefined };
+  const onQuestionSubmit: SubmitHandler<QuestionFormValues> = (values) => {
+    if (values.type === 'FILL_IN_BLANK') {
+      const answers = values.correctAnswers?.map(a => a.trim()).filter(a => a) || [];
+      const dto = { ...values, correctAnswers: answers, options: undefined };
       if (editingQuestionId) { updateMutation.mutate({ questionId: editingQuestionId, dto }); }
       else { addMutation.mutate(dto); }
     } else {
-      if (!form.options.some((o) => o.isCorrect)) { toast.error('Phải chọn ít nhất 1 đáp án đúng'); return; }
-      const dto = { ...form, correctAnswers: undefined };
+      const dto = { ...values, correctAnswers: undefined };
       if (editingQuestionId) { updateMutation.mutate({ questionId: editingQuestionId, dto }); }
       else { addMutation.mutate(dto); }
     }
-  };
-
-  const updateOption = (idx: number, field: string, value: any) => {
-    const opts = [...form.options];
-    (opts[idx] as any)[field] = value;
-    if (field === 'isCorrect' && form.type === 'SINGLE_CHOICE' && value) {
-      opts.forEach((o, i) => { if (i !== idx) o.isCorrect = false; });
-    }
-    setForm({ ...form, options: opts });
   };
 
   // === Handlers: Câu chùm ===
   const openCreateGroup = () => {
     setEditingGroupId(null);
-    setGroupForm({
+    resetG({
       title: '', content: '', imageUrl: '', audioUrl: '', youtubeUrl: '',
       questions: [{ ...defaultSubQuestion, options: defaultOptions.map(o => ({ ...o })) }],
     });
@@ -224,7 +208,7 @@ export default function ExamDetailAdminPage() {
 
   const openEditGroup = (g: any) => {
     setEditingGroupId(g.id);
-    setGroupForm({
+    resetG({
       title: g.title || '', content: g.content || '', imageUrl: g.imageUrl || '',
       audioUrl: g.audioUrl || '', youtubeUrl: g.youtubeUrl || '',
       questions: g.questions?.map((q: any) => ({
@@ -237,49 +221,12 @@ export default function ExamDetailAdminPage() {
 
   const closeGroupModal = () => { setShowGroupModal(false); setEditingGroupId(null); };
 
-  const handleGroupSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!groupForm.content.trim()) { toast.error('Nội dung chung không được để trống'); return; }
-    if (groupForm.questions.length === 0) { toast.error('Phải có ít nhất 1 câu hỏi con'); return; }
-    for (let i = 0; i < groupForm.questions.length; i++) {
-      if (!groupForm.questions[i].options.some(o => o.isCorrect)) {
-        toast.error(`Câu hỏi con ${i + 1}: phải chọn đáp án đúng`); return;
-      }
-    }
+  const onGroupSubmit: SubmitHandler<GroupFormValues> = (values) => {
     if (editingGroupId) {
-      updateGroupMutation.mutate({ groupId: editingGroupId, dto: groupForm });
+      updateGroupMutation.mutate({ groupId: editingGroupId, dto: values });
     } else {
-      addGroupMutation.mutate(groupForm);
+      addGroupMutation.mutate(values);
     }
-  };
-
-  const addSubQuestion = () => {
-    setGroupForm({
-      ...groupForm,
-      questions: [...groupForm.questions, { ...defaultSubQuestion, options: defaultOptions.map(o => ({ ...o })) }],
-    });
-  };
-
-  const removeSubQuestion = (idx: number) => {
-    if (groupForm.questions.length <= 1) return;
-    setGroupForm({ ...groupForm, questions: groupForm.questions.filter((_, i) => i !== idx) });
-  };
-
-  const updateSubQuestion = (idx: number, field: string, value: any) => {
-    const qs = [...groupForm.questions];
-    (qs[idx] as any)[field] = value;
-    setGroupForm({ ...groupForm, questions: qs });
-  };
-
-  const updateSubOption = (qIdx: number, oIdx: number, field: string, value: any) => {
-    const qs = [...groupForm.questions];
-    const opts = [...qs[qIdx].options];
-    (opts[oIdx] as any)[field] = value;
-    if (field === 'isCorrect' && qs[qIdx].type === 'SINGLE_CHOICE' && value) {
-      opts.forEach((o, i) => { if (i !== oIdx) o.isCorrect = false; });
-    }
-    qs[qIdx] = { ...qs[qIdx], options: opts };
-    setGroupForm({ ...groupForm, questions: qs });
   };
 
   // === Misc ===
@@ -580,99 +527,82 @@ export default function ExamDetailAdminPage() {
         title={editingQuestionId ? 'Sửa câu hỏi' : 'Thêm câu hỏi mới'}
         maxWidth="2xl"
       >
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Loại câu hỏi</label>
-              <AppSelect
-                value={{ value: form.type, label: form.type === 'SINGLE_CHOICE' ? 'Một đáp án' : form.type === 'FILL_IN_BLANK' ? 'Điền đáp án' : 'Nhiều đáp án' }}
-                onChange={(opt) => opt && setForm({ ...form, type: opt.value })}
-                options={[
-                  { value: 'SINGLE_CHOICE', label: 'Một đáp án' },
-                  { value: 'MULTIPLE_CHOICE', label: 'Nhiều đáp án' },
-                  { value: 'FILL_IN_BLANK', label: 'Điền đáp án' },
-                ]}
-                isSearchable={false}
-                placeholder="Chọn loại câu hỏi"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung câu hỏi *</label>
-              <RichTextEditor content={form.content} onChange={(html) => setForm({ ...form, content: html })} placeholder="Nhập nội dung câu hỏi... (hỗ trợ LaTeX: $\frac{a}{b}$)" />
-            </div>
+        <form onSubmit={handleQSubmit(onQuestionSubmit)} className="p-6 space-y-4">
+            <Controller name="type" control={qControl} render={({ field }) => (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Loại câu hỏi</label>
+                <AppSelect
+                  value={{ value: field.value, label: field.value === 'SINGLE_CHOICE' ? 'Một đáp án' : field.value === 'FILL_IN_BLANK' ? 'Điền đáp án' : 'Nhiều đáp án' }}
+                  onChange={(opt) => field.onChange(opt?.value || 'SINGLE_CHOICE')}
+                  options={[{ value: 'SINGLE_CHOICE', label: 'Một đáp án' }, { value: 'MULTIPLE_CHOICE', label: 'Nhiều đáp án' }, { value: 'FILL_IN_BLANK', label: 'Điền đáp án' }]}
+                  isSearchable={false} placeholder="Chọn loại câu hỏi"
+                />
+              </div>
+            )} />
+            <Controller name="content" control={qControl} render={({ field, fieldState }) => (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung câu hỏi *</label>
+                <RichTextEditor content={field.value} onChange={field.onChange} placeholder="Nhập nội dung câu hỏi... (hỗ trợ LaTeX: $\frac{a}{b}$)" />
+                {fieldState.error && <p className="text-xs text-red-500 mt-1">{fieldState.error.message}</p>}
+              </div>
+            )} />
             {/* Media inputs */}
             <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
               <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">🖼️ Đa phương tiện (không bắt buộc)</p>
               <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Hình ảnh</label>
-                  <FileUploadInput type="image" value={form.imageUrl} onChange={(url) => setForm({ ...form, imageUrl: url })} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Audio</label>
-                  <FileUploadInput type="audio" value={form.audioUrl} onChange={(url) => setForm({ ...form, audioUrl: url })} />
-                </div>
-                <AppInput
-                  label="Link YouTube"
-                  type="url"
-                  value={form.youtubeUrl}
-                  onChange={(e) => setForm({ ...form, youtubeUrl: e.target.value })}
-                  placeholder="https://youtube.com/..."
-                />
+                <Controller name="imageUrl" control={qControl} render={({ field }) => (
+                  <div><label className="block text-xs font-medium text-slate-600 mb-1">Hình ảnh</label><FileUploadInput type="image" value={field.value || ''} onChange={field.onChange} /></div>
+                )} />
+                <Controller name="audioUrl" control={qControl} render={({ field }) => (
+                  <div><label className="block text-xs font-medium text-slate-600 mb-1">Audio</label><FileUploadInput type="audio" value={field.value || ''} onChange={field.onChange} /></div>
+                )} />
+                <Controller name="youtubeUrl" control={qControl} render={({ field }) => (
+                  <AppInput label="Link YouTube" type="url" value={field.value || ''} onChange={field.onChange} placeholder="https://youtube.com/..." />
+                )} />
               </div>
             </div>
-
-            {/* Đáp án: tuỳ theo loại câu hỏi */}
-            {form.type === 'FILL_IN_BLANK' ? (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Đáp án đúng * <span className="text-xs text-slate-400 font-normal">(mỗi ô input tương ứng với 1 chỗ trống cần điền)</span></label>
-                <div className="space-y-3">
-                  {form.correctAnswers.map((ans, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
-                      <span className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-700">{idx + 1}</span>
-                      <input
-                        type="text"
-                        value={ans}
-                        onChange={(e) => {
-                          const newAns = [...form.correctAnswers];
-                          newAns[idx] = e.target.value;
-                          setForm({ ...form, correctAnswers: newAns });
-                        }}
-                        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder={`Đáp án đúng cho ô trống ${idx + 1}...`}
-                      />
-                      {form.correctAnswers.length > 1 && (
-                        <AppButton type="button" variant="danger-ghost" size="icon" onClick={() => { setForm({ ...form, correctAnswers: form.correctAnswers.filter((_, i) => i !== idx) }); }} icon={<X className="w-4 h-4" />} />
-                      )}
-                    </div>
-                  ))}
-                  <AppButton type="button" variant="outline" size="sm" onClick={() => setForm({ ...form, correctAnswers: [...form.correctAnswers, ''] })} icon={<Plus className="w-3.5 h-3.5" />} className="border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 w-fit">
-                    Thêm chỗ trống
-                  </AppButton>
+            {/* Đáp án */}
+            {qType === 'FILL_IN_BLANK' ? (
+              <Controller name="correctAnswers" control={qControl} render={({ field, fieldState }) => (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Đáp án đúng * <span className="text-xs text-slate-400 font-normal">(mỗi ô input tương ứng với 1 chỗ trống cần điền)</span></label>
+                  <div className="space-y-3">
+                    {(field.value || []).map((ans, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-700">{idx + 1}</span>
+                        <input type="text" value={ans} onChange={(e) => { const newAns = [...(field.value || [])]; newAns[idx] = e.target.value; field.onChange(newAns); }} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={`Đáp án đúng cho ô trống ${idx + 1}...`} />
+                        {(field.value || []).length > 1 && <AppButton type="button" variant="danger-ghost" size="icon" onClick={() => field.onChange((field.value || []).filter((_, i) => i !== idx))} icon={<X className="w-4 h-4" />} />}
+                      </div>
+                    ))}
+                    <AppButton type="button" variant="outline" size="sm" onClick={() => field.onChange([...(field.value || []), ''])} icon={<Plus className="w-3.5 h-3.5" />} className="border-blue-200 text-blue-600 bg-blue-50 hover:bg-blue-100 w-fit">Thêm chỗ trống</AppButton>
+                  </div>
+                  {fieldState.error && <p className="text-xs text-red-500 mt-1">{fieldState.error.message}</p>}
+                  {qErrors.correctAnswers?.root && <p className="text-xs text-red-500 mt-1">{qErrors.correctAnswers.root.message}</p>}
                 </div>
-                <p className="text-xs text-slate-400 mt-2">Hệ thống không phân biệt hoa/thường khi chấm. Mỗi ô trống yêu cầu nhập chính xác 1 đáp án (hỗ trợ nhiều ô trống trên 1 câu hỏi).</p>
-              </div>
+              )} />
             ) : (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Đáp án *</label>
-                <div className="space-y-3">
-                  {form.options.map((opt, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
-                        <input type={form.type === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'} name="correct" checked={opt.isCorrect} onChange={(e) => updateOption(idx, 'isCorrect', e.target.checked)}
-                          className="w-4 h-4 text-green-600 focus:ring-green-500" />
-                        <span className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-700">{opt.label}</span>
-                      </label>
-                      <input type="text" value={opt.content} onChange={(e) => updateOption(idx, 'content', e.target.value)}
-                        className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={`Nội dung đáp án ${opt.label}`} />
-                    </div>
-                  ))}
+              <Controller name="options" control={qControl} render={({ field, fieldState }) => (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Đáp án *</label>
+                  <div className="space-y-3">
+                    {(field.value || []).map((opt, idx) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer flex-shrink-0">
+                          <input type={qType === 'SINGLE_CHOICE' ? 'radio' : 'checkbox'} name="correct" checked={opt.isCorrect} onChange={(e) => { const newOpts = [...(field.value || [])]; newOpts[idx].isCorrect = e.target.checked; if (e.target.checked && qType === 'SINGLE_CHOICE') newOpts.forEach((o, i) => { if (i !== idx) o.isCorrect = false; }); field.onChange(newOpts); }} className="w-4 h-4 text-green-600 focus:ring-green-500" />
+                          <span className="w-7 h-7 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-700">{opt.label}</span>
+                        </label>
+                        <input type="text" value={opt.content} onChange={(e) => { const newOpts = [...(field.value || [])]; newOpts[idx].content = e.target.value; field.onChange(newOpts); }} className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder={`Nội dung đáp án ${opt.label}`} />
+                      </div>
+                    ))}
+                  </div>
+                  {fieldState.error && <p className="text-xs text-red-500 mt-1">{fieldState.error.message}</p>}
+                  {qErrors.options?.root && <p className="text-xs text-red-500 mt-1">{qErrors.options.root.message}</p>}
                 </div>
-              </div>
+              )} />
             )}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Giải thích</label>
-              <RichTextEditor content={form.explanation} onChange={(html) => setForm({ ...form, explanation: html })} placeholder="Giải thích đáp án (không bắt buộc)" />
-            </div>
+            <Controller name="explanation" control={qControl} render={({ field }) => (
+              <div><label className="block text-sm font-medium text-slate-700 mb-1.5">Giải thích</label><RichTextEditor content={field.value || ''} onChange={field.onChange} placeholder="Giải thích đáp án (không bắt buộc)" /></div>
+            )} />
             <div className="flex gap-3 pt-2">
               <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>Huỷ</AppButton>
               <AppButton type="submit" isLoading={addMutation.isPending || updateMutation.isPending} fullWidth>{editingQuestionId ? 'Cập nhật' : 'Tạo mới'}</AppButton>
@@ -695,86 +625,79 @@ export default function ExamDetailAdminPage() {
         }
         maxWidth="4xl"
       >
-        <form onSubmit={handleGroupSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleGSubmit(onGroupSubmit)} className="p-6 space-y-5">
             {/* Group Info */}
             <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 space-y-4">
               <p className="text-sm font-semibold text-purple-800">📖 Thông tin nội dung chung</p>
-              <AppInput
-                label="Tiêu đề nhóm"
-                type="text"
-                value={groupForm.title}
-                onChange={(e) => setGroupForm({ ...groupForm, title: e.target.value })}
-                placeholder="VD: Đọc hiểu đoạn văn..."
-              />
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung chung * (Rich Text + LaTeX)</label>
-                <RichTextEditor content={groupForm.content} onChange={(html) => setGroupForm({ ...groupForm, content: html })} placeholder="Nhập đoạn văn, bài toán, bảng dữ liệu..." />
-              </div>
+              <Controller name="title" control={gControl} render={({ field }) => (
+                <AppInput label="Tiêu đề nhóm" type="text" value={field.value || ''} onChange={field.onChange} placeholder="VD: Đọc hiểu đoạn văn..." />
+              )} />
+              <Controller name="content" control={gControl} render={({ field, fieldState }) => (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung chung * (Rich Text + LaTeX)</label>
+                  <RichTextEditor content={field.value} onChange={field.onChange} placeholder="Nhập đoạn văn, bài toán, bảng dữ liệu..." />
+                  {fieldState.error && <p className="text-xs text-red-500 mt-1">{fieldState.error.message}</p>}
+                </div>
+              )} />
               {/* Media inputs cho group */}
               <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Hình ảnh</label>
-                  <FileUploadInput type="image" value={groupForm.imageUrl} onChange={(url) => setGroupForm({ ...groupForm, imageUrl: url })} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Audio</label>
-                  <FileUploadInput type="audio" value={groupForm.audioUrl} onChange={(url) => setGroupForm({ ...groupForm, audioUrl: url })} />
-                </div>
-                <AppInput
-                  label="Link YouTube"
-                  type="url"
-                  value={groupForm.youtubeUrl}
-                  onChange={(e) => setGroupForm({ ...groupForm, youtubeUrl: e.target.value })}
-                  placeholder="https://youtube.com/..."
-                />
+                <Controller name="imageUrl" control={gControl} render={({ field }) => (
+                  <div><label className="block text-xs font-medium text-slate-600 mb-1">Hình ảnh</label><FileUploadInput type="image" value={field.value || ''} onChange={field.onChange} /></div>
+                )} />
+                <Controller name="audioUrl" control={gControl} render={({ field }) => (
+                  <div><label className="block text-xs font-medium text-slate-600 mb-1">Audio</label><FileUploadInput type="audio" value={field.value || ''} onChange={field.onChange} /></div>
+                )} />
+                <Controller name="youtubeUrl" control={gControl} render={({ field }) => (
+                  <AppInput label="Link YouTube" type="url" value={field.value || ''} onChange={field.onChange} placeholder="https://youtube.com/..." />
+                )} />
               </div>
             </div>
 
             {/* Sub Questions */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-800">Danh sách câu hỏi con ({groupForm.questions.length})</p>
-                <AppButton type="button" variant="purple" size="sm" onClick={addSubQuestion} icon={<Plus className="w-3.5 h-3.5" />}>
-                  Thêm câu con
-                </AppButton>
-              </div>
-
-              {groupForm.questions.map((subQ, qIdx) => (
-                <div key={qIdx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-slate-700">Câu {qIdx + 1}</span>
-                    {groupForm.questions.length > 1 && (
-                      <AppButton type="button" variant="danger-ghost" size="icon" onClick={() => removeSubQuestion(qIdx)} className="p-1" icon={<X className="w-4 h-4" />} />
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Nội dung câu hỏi *</label>
-                    <RichTextEditor content={subQ.content} onChange={(html) => updateSubQuestion(qIdx, 'content', html)} placeholder="Nội dung câu hỏi con..." />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1.5">Đáp án *</label>
-                    <div className="space-y-2">
-                      {subQ.options.map((opt, oIdx) => (
-                        <div key={oIdx} className="flex items-center gap-2">
-                          <label className="flex items-center gap-1.5 cursor-pointer flex-shrink-0">
-                            <input type="radio" name={`sub-correct-${qIdx}`} checked={opt.isCorrect} onChange={() => updateSubOption(qIdx, oIdx, 'isCorrect', true)}
-                              className="w-3.5 h-3.5 text-green-600 focus:ring-green-500" />
-                            <span className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">{opt.label}</span>
-                          </label>
-                          <input type="text" value={opt.content} onChange={(e) => updateSubOption(qIdx, oIdx, 'content', e.target.value)}
-                            className="flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder={`Đáp án ${opt.label}`} />
-                        </div>
-                      ))}
+            <Controller name="questions" control={gControl} render={({ field, fieldState }) => (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-slate-800">Danh sách câu hỏi con ({(field.value || []).length})</p>
+                  <AppButton type="button" variant="purple" size="sm" onClick={() => field.onChange([...(field.value || []), { ...defaultSubQuestion, options: defaultOptions.map(o => ({ ...o })) }])} icon={<Plus className="w-3.5 h-3.5" />}>Thêm câu con</AppButton>
+                </div>
+                {fieldState.error && <p className="text-xs text-red-500">{fieldState.error.message}</p>}
+                {gErrors.questions?.root && <p className="text-xs text-red-500">{gErrors.questions.root.message}</p>}
+                {(field.value || []).map((subQ, qIdx) => (
+                  <div key={qIdx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-slate-700">Câu {qIdx + 1}</span>
+                      {(field.value || []).length > 1 && (
+                        <AppButton type="button" variant="danger-ghost" size="icon" onClick={() => field.onChange((field.value || []).filter((_, i) => i !== qIdx))} className="p-1" icon={<X className="w-4 h-4" />} />
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Nội dung câu hỏi *</label>
+                      <RichTextEditor content={subQ.content} onChange={(html) => { const qs = [...(field.value || [])]; qs[qIdx].content = html; field.onChange(qs); }} placeholder="Nội dung câu hỏi con..." />
+                      {gErrors.questions?.[qIdx]?.content && <p className="text-xs text-red-500 mt-1">{gErrors.questions[qIdx]?.content?.message}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1.5">Đáp án *</label>
+                      <div className="space-y-2">
+                        {subQ.options.map((opt, oIdx) => (
+                          <div key={oIdx} className="flex items-center gap-2">
+                            <label className="flex items-center gap-1.5 cursor-pointer flex-shrink-0">
+                              <input type="radio" name={`sub-correct-${qIdx}`} checked={opt.isCorrect} onChange={() => { const qs = [...(field.value || [])]; qs[qIdx].options.forEach((o, i) => o.isCorrect = i === oIdx); field.onChange(qs); }} className="w-3.5 h-3.5 text-green-600 focus:ring-green-500" />
+                              <span className="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">{opt.label}</span>
+                            </label>
+                            <input type="text" value={opt.content} onChange={(e) => { const qs = [...(field.value || [])]; qs[qIdx].options[oIdx].content = e.target.value; field.onChange(qs); }} className="flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder={`Đáp án ${opt.label}`} />
+                          </div>
+                        ))}
+                      </div>
+                      {gErrors.questions?.[qIdx]?.options && <p className="text-xs text-red-500 mt-1">{gErrors.questions[qIdx]?.options?.message}</p>}
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-600 mb-1">Giải thích</label>
+                      <RichTextEditor content={subQ.explanation || ''} onChange={(html) => { const qs = [...(field.value || [])]; qs[qIdx].explanation = html; field.onChange(qs); }} placeholder="Giải thích (tuỳ chọn)" />
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-600 mb-1">Giải thích</label>
-                    <RichTextEditor content={subQ.explanation} onChange={(html) => updateSubQuestion(qIdx, 'explanation', html)} placeholder="Giải thích (tuỳ chọn)" />
-                  </div>
-                </div>
-              ))}
-            </div>
-
+                ))}
+              </div>
+            )} />
             <div className="flex gap-3 pt-2">
               <AppButton type="button" variant="secondary" onClick={closeGroupModal} fullWidth>Huỷ</AppButton>
               <AppButton type="submit" variant="primary" className="bg-purple-600 hover:bg-purple-700 focus:ring-purple-500" isLoading={addGroupMutation.isPending || updateGroupMutation.isPending} fullWidth>

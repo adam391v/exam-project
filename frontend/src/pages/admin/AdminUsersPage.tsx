@@ -8,6 +8,21 @@ import ConfirmModal from '../../components/ConfirmModal';
 import AppModal from '../../components/AppModal';
 import AppInput from '../../components/AppInput';
 import AppButton from '../../components/AppButton';
+import { useForm, Controller } from 'react-hook-form';
+import type { SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const userSchema = z.object({
+  username: z.string().optional(),
+  password: z.string().optional(),
+  fullName: z.string().min(1, 'Vui lòng nhập họ tên'),
+  email: z.string().email('Email không hợp lệ').or(z.literal('')),
+  role: z.string().min(1, 'Vui lòng chọn vai trò'),
+  isActive: z.boolean(),
+});
+
+type UserFormValues = z.infer<typeof userSchema>;
 
 export default function AdminUsersPage() {
   const queryClient = useQueryClient();
@@ -16,7 +31,18 @@ export default function AdminUsersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; name: string } | null>(null);
-  const [form, setForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'ADMIN', isActive: true });
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    setError,
+    formState: { errors },
+  } = useForm<UserFormValues>({
+    resolver: zodResolver(userSchema),
+    defaultValues: { username: '', password: '', fullName: '', email: '', role: 'ADMIN', isActive: true },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-users', page, search],
@@ -42,24 +68,39 @@ export default function AdminUsersPage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ username: '', password: '', fullName: '', email: '', role: 'ADMIN', isActive: true });
+    reset({ username: '', password: '', fullName: '', email: '', role: 'ADMIN', isActive: true });
     setShowModal(true);
   };
 
   const openEdit = (user: any) => {
     setEditingId(user.id);
-    setForm({ username: user.username, password: '', fullName: user.fullName, email: user.email || '', role: user.role, isActive: user.isActive });
+    reset({ username: user.username, password: '', fullName: user.fullName, email: user.email || '', role: user.role, isActive: user.isActive });
     setShowModal(true);
   };
 
   const closeModal = () => { setShowModal(false); setEditingId(null); };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const dto: any = { ...form };
-    if (!dto.password) delete dto.password;
-    if (editingId) { delete dto.username; updateMutation.mutate({ id: editingId, dto }); }
-    else { createMutation.mutate(dto); }
+  const onSubmit: SubmitHandler<UserFormValues> = (values) => {
+    const dto: any = { ...values };
+    
+    if (editingId) {
+      delete dto.username;
+      if (!dto.password?.trim()) {
+        delete dto.password; // Không đổi pass
+      }
+      updateMutation.mutate({ id: editingId, dto });
+    } else {
+      // Validate thêm mới
+      if (!dto.username?.trim()) {
+        setError('username', { message: 'Vui lòng nhập username' });
+        return;
+      }
+      if (!dto.password?.trim()) {
+        setError('password', { message: 'Vui lòng nhập mật khẩu' });
+        return;
+      }
+      createMutation.mutate(dto);
+    }
   };
 
   const roleLabels: Record<string, string> = { SUPER_ADMIN: 'Super Admin', ADMIN: 'Admin', TEACHER: 'Giáo viên' };
@@ -152,43 +193,43 @@ export default function AdminUsersPage() {
         title={editingId ? 'Sửa tài khoản' : 'Thêm tài khoản mới'}
         maxWidth="lg"
       >
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {!editingId && (
-                <AppInput
-                  label="Username *"
-                  type="text"
-                  required
-                  value={form.username}
-                  onChange={(e) => setForm({ ...form, username: e.target.value })}
-                />
-              )}
-              <AppInput
-                label={`Mật khẩu ${editingId ? '(Bỏ trống nếu không đổi)' : '*'}`}
-                type="password"
-                required={!editingId}
-                minLength={6}
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-              />
-              <AppInput
-                label="Họ tên *"
-                type="text"
-                required
-                value={form.fullName}
-                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-              />
-              <AppInput
-                label="Email"
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-              />
-              <div className="flex gap-4">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Vai trò</label>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          {!editingId && (
+            <AppInput
+              label="Username *"
+              type="text"
+              {...register('username')}
+              error={errors.username?.message}
+            />
+          )}
+          <AppInput
+            label={`Mật khẩu ${editingId ? '(Bỏ trống nếu không đổi)' : '*'}`}
+            type="password"
+            {...register('password')}
+            error={errors.password?.message}
+          />
+          <AppInput
+            label="Họ tên *"
+            type="text"
+            {...register('fullName')}
+            error={errors.fullName?.message}
+          />
+          <AppInput
+            label="Email"
+            type="email"
+            {...register('email')}
+            error={errors.email?.message}
+          />
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Vai trò</label>
+              <Controller
+                name="role"
+                control={control}
+                render={({ field }) => (
                   <AppSelect
-                    value={{ value: form.role, label: roleLabels[form.role] || form.role }}
-                    onChange={(opt) => opt && setForm({ ...form, role: opt.value })}
+                    value={{ value: field.value, label: roleLabels[field.value] || field.value }}
+                    onChange={(opt) => field.onChange(opt ? String(opt.value) : 'ADMIN')}
                     options={[
                       { value: 'ADMIN', label: 'Admin' },
                       { value: 'TEACHER', label: 'Giáo viên' },
@@ -196,18 +237,21 @@ export default function AdminUsersPage() {
                     ]}
                     isSearchable={false}
                     placeholder="Chọn vai trò"
+                    error={errors.role?.message}
                   />
-                </div>
-                <label className="flex items-center gap-2 cursor-pointer self-end pb-2.5">
-                  <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="w-4 h-4 rounded" />
-                  <span className="text-sm text-slate-700">Hoạt động</span>
-                </label>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>Huỷ</AppButton>
-                <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>{editingId ? 'Cập nhật' : 'Tạo mới'}</AppButton>
-              </div>
-            </form>
+                )}
+              />
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer self-end pb-2.5">
+              <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" {...register('isActive')} />
+              <span className="text-sm text-slate-700">Hoạt động</span>
+            </label>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>Huỷ</AppButton>
+            <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>{editingId ? 'Cập nhật' : 'Tạo mới'}</AppButton>
+          </div>
+        </form>
       </AppModal>
 
       <ConfirmModal

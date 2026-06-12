@@ -8,6 +8,10 @@ import ConfirmModal from '../../components/ConfirmModal';
 import AppModal from '../../components/AppModal';
 import AppInput from '../../components/AppInput';
 import AppButton from '../../components/AppButton';
+import { useForm, Controller } from 'react-hook-form';
+import type { SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 
 // Options khối 1-12
 const gradeOptions = Array.from({ length: 12 }, (_, i) => ({
@@ -15,13 +19,13 @@ const gradeOptions = Array.from({ length: 12 }, (_, i) => ({
   label: `Khối ${i + 1}`,
 }));
 
-interface ClassroomForm {
-  name: string;
-  grade: number;
-  sortOrder: number;
-}
+const classroomSchema = z.object({
+  name: z.string().min(1, 'Vui lòng nhập tên lớp'),
+  grade: z.number().int().min(1, 'Vui lòng chọn khối'),
+  sortOrder: z.number().int(),
+});
 
-const defaultForm: ClassroomForm = { name: '', grade: 1, sortOrder: 0 };
+type ClassroomFormValues = z.infer<typeof classroomSchema>;
 
 export default function ClassroomsPage() {
   const queryClient = useQueryClient();
@@ -31,7 +35,17 @@ export default function ClassroomsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; name: string } | null>(null);
-  const [form, setForm] = useState<ClassroomForm>({ ...defaultForm });
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors },
+  } = useForm<ClassroomFormValues>({
+    resolver: zodResolver(classroomSchema),
+    defaultValues: { name: '', grade: 1, sortOrder: 0 },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-classrooms', page, search, filterGrade],
@@ -44,13 +58,13 @@ export default function ClassroomsPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (dto: ClassroomForm) => adminClassroomService.create(dto),
+    mutationFn: (dto: ClassroomFormValues) => adminClassroomService.create(dto),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin-classrooms'] }); toast.success('Tạo lớp học thành công'); closeModal(); },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Lỗi'),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, dto }: { id: string; dto: Partial<ClassroomForm> & { isActive?: boolean } }) => adminClassroomService.update(id, dto),
+    mutationFn: ({ id, dto }: { id: string; dto: Partial<ClassroomFormValues> & { isActive?: boolean } }) => adminClassroomService.update(id, dto),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['admin-classrooms'] }); toast.success('Cập nhật thành công'); closeModal(); },
     onError: (err: any) => toast.error(err.response?.data?.message || 'Lỗi'),
   });
@@ -62,23 +76,21 @@ export default function ClassroomsPage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ ...defaultForm });
+    reset({ name: '', grade: 1, sortOrder: 0 });
     setShowModal(true);
   };
 
   const openEdit = (c: any) => {
     setEditingId(c.id);
-    setForm({ name: c.name, grade: c.grade, sortOrder: c.sortOrder || 0 });
+    reset({ name: c.name, grade: c.grade, sortOrder: c.sortOrder || 0 });
     setShowModal(true);
   };
 
   const closeModal = () => { setShowModal(false); setEditingId(null); };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.name.trim()) { toast.error('Nhập tên lớp'); return; }
-    if (editingId) { updateMutation.mutate({ id: editingId, dto: form }); }
-    else { createMutation.mutate(form); }
+  const onSubmit: SubmitHandler<ClassroomFormValues> = (values) => {
+    if (editingId) { updateMutation.mutate({ id: editingId, dto: values }); }
+    else { createMutation.mutate(values); }
   };
 
   const classrooms = data?.data || [];
@@ -181,38 +193,44 @@ export default function ClassroomsPage() {
         title={editingId ? 'Sửa lớp học' : 'Thêm lớp học mới'}
         maxWidth="md"
       >
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Khối *</label>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Khối *</label>
+            <Controller
+              name="grade"
+              control={control}
+              render={({ field }) => (
                 <AppSelect
-                  value={gradeOptions.find(o => o.value === String(form.grade)) || null}
-                  onChange={(opt) => opt && setForm({ ...form, grade: Number(opt.value) })}
+                  value={gradeOptions.find(o => o.value === String(field.value)) || null}
+                  onChange={(opt) => field.onChange(opt ? Number(opt.value) : 1)}
                   options={gradeOptions}
                   placeholder="Chọn khối"
                   isSearchable={false}
+                  error={errors.grade?.message}
                 />
-              </div>
-              <AppInput
-                label="Tên lớp *"
-                type="text"
-                required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="VD: Lớp 10A1"
-              />
-              <AppInput
-                label="Thứ tự sắp xếp"
-                type="number"
-                value={String(form.sortOrder)}
-                onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })}
-              />
-              <div className="flex gap-3 pt-2">
-                <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>Huỷ</AppButton>
-                <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>
-                  {editingId ? 'Cập nhật' : 'Tạo mới'}
-                </AppButton>
-              </div>
-            </form>
+              )}
+            />
+          </div>
+          <AppInput
+            label="Tên lớp *"
+            type="text"
+            placeholder="VD: Lớp 10A1"
+            {...register('name')}
+            error={errors.name?.message}
+          />
+          <AppInput
+            label="Thứ tự hiển thị"
+            type="number"
+            {...register('sortOrder', { valueAsNumber: true })}
+            error={errors.sortOrder?.message}
+          />
+          <div className="flex gap-3 pt-2">
+            <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>Huỷ</AppButton>
+            <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>
+              {editingId ? 'Cập nhật' : 'Tạo mới'}
+            </AppButton>
+          </div>
+        </form>
       </AppModal>
 
       <ConfirmModal

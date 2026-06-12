@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, X, Loader2 } from 'lucide-react';
+import { Upload, X } from 'lucide-react';
 import { uploadService } from '../services/data.service';
 import { toast } from 'sonner';
 import AppButton from './AppButton';

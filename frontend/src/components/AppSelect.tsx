@@ -7,11 +7,11 @@ export interface SelectOption {
 
 interface AppSelectProps extends Omit<ReactSelectProps<SelectOption, false, GroupBase<SelectOption>>, 'styles' | 'theme'> {
   /** Hiển thị error state */
-  error?: boolean;
+  error?: boolean | string;
 }
 
 /** Custom styles phù hợp design system */
-const customStyles = (hasError?: boolean): StylesConfig<SelectOption, false> => ({
+const customStyles = (hasError?: boolean | string): StylesConfig<SelectOption, false> => ({
   control: (base, state) => ({
     ...base,
     borderRadius: '0.75rem',

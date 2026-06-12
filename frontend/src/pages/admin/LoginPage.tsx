@@ -6,24 +6,39 @@ import { toast } from 'sonner';
 import { BookOpen, LogIn } from 'lucide-react';
 import AppInput from '../../components/AppInput';
 import AppButton from '../../components/AppButton';
+import { useForm } from 'react-hook-form';
+import type { SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const loginSchema = z.object({
+  username: z.string().min(1, 'Vui lòng nhập tên đăng nhập'),
+  password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [form, setForm] = useState({ username: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: '',
+      password: '',
+    },
+  });
 
-    if (!form.username.trim() || !form.password.trim()) {
-      toast.error('Vui lòng nhập đầy đủ thông tin');
-      return;
-    }
-
+  const onSubmit: SubmitHandler<LoginFormValues> = async (values) => {
     setIsLoading(true);
     try {
-      const data = await authService.login(form.username, form.password);
+      const data = await authService.login(values.username, values.password);
       setAuth(data.accessToken, data.user);
       toast.success(`Xin chào, ${data.user.fullName}!`);
       navigate('/admin/dashboard');
@@ -47,24 +62,22 @@ export default function LoginPage() {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleLogin} className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
           <div className="space-y-5">
             <AppInput
               label="Tên đăng nhập"
               type="text"
-              required
-              value={form.username}
-              onChange={(e) => setForm({ ...form, username: e.target.value })}
               placeholder="Nhập tên đăng nhập"
+              {...register('username')}
+              error={errors.username?.message}
             />
 
             <AppInput
               label="Mật khẩu"
               type="password"
-              required
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
               placeholder="••••••••"
+              {...register('password')}
+              error={errors.password?.message}
             />
 
             <AppButton

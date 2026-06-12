@@ -11,6 +11,26 @@ import AppModal from '../../components/AppModal';
 import AppInput from '../../components/AppInput';
 import AppButton from '../../components/AppButton';
 import type { Exam } from '../../types/api.types';
+import { useForm, Controller } from 'react-hook-form';
+import type { SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const examSchema = z.object({
+  title: z.string().min(1, 'Vui lòng nhập tên đề thi'),
+  subjectId: z.string().min(1, 'Vui lòng chọn môn học'),
+  duration: z.number().int().min(1, 'Thời gian phải lớn hơn 0'),
+  description: z.string().optional(),
+  isPublic: z.boolean(),
+  showAnswer: z.boolean(),
+  shuffleQuestions: z.boolean(),
+  shuffleOptions: z.boolean(),
+  passingScore: z.number().min(0).max(10),
+  startTime: z.string().optional().or(z.literal('')),
+  endTime: z.string().optional().or(z.literal('')),
+});
+
+type ExamFormValues = z.infer<typeof examSchema>;
 
 export default function ExamsPage() {
   const queryClient = useQueryClient();
@@ -20,10 +40,20 @@ export default function ExamsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; name: string } | null>(null);
-  const [form, setForm] = useState({
-    title: '', subjectId: '', duration: 30, description: '', isPublic: false,
-    showAnswer: true, shuffleQuestions: false, shuffleOptions: false, passingScore: 5,
-    startTime: '', endTime: ''
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors },
+  } = useForm<ExamFormValues>({
+    resolver: zodResolver(examSchema),
+    defaultValues: {
+      title: '', subjectId: '', duration: 30, description: '', isPublic: false,
+      showAnswer: true, shuffleQuestions: false, shuffleOptions: false, passingScore: 5,
+      startTime: '', endTime: ''
+    },
   });
 
   const { data, isLoading } = useQuery({
@@ -69,13 +99,13 @@ export default function ExamsPage() {
 
   const openCreate = () => {
     setEditingExam(null);
-    setForm({ title: '', subjectId: '', duration: 30, description: '', isPublic: false, showAnswer: true, shuffleQuestions: false, shuffleOptions: false, passingScore: 5, startTime: '', endTime: '' });
+    reset({ title: '', subjectId: '', duration: 30, description: '', isPublic: false, showAnswer: true, shuffleQuestions: false, shuffleOptions: false, passingScore: 5, startTime: '', endTime: '' });
     setShowModal(true);
   };
 
   const openEdit = (exam: Exam) => {
     setEditingExam(exam);
-    setForm({
+    reset({
       title: exam.title, subjectId: exam.subject?.id || '', duration: exam.duration,
       description: exam.description || '', isPublic: exam.isPublic, showAnswer: exam.showAnswer,
       shuffleQuestions: exam.shuffleQuestions || false, shuffleOptions: exam.shuffleOptions || false, passingScore: exam.passingScore || 5,
@@ -87,12 +117,11 @@ export default function ExamsPage() {
 
   const closeModal = () => { setShowModal(false); setEditingExam(null); };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit: SubmitHandler<ExamFormValues> = (values) => {
     const payload = {
-      ...form,
-      startTime: form.startTime || null,
-      endTime: form.endTime || null,
+      ...values,
+      startTime: values.startTime || null,
+      endTime: values.endTime || null,
     };
     if (editingExam) { updateMutation.mutate({ id: editingExam.id, dto: payload }); }
     else { createMutation.mutate(payload); }
@@ -197,76 +226,106 @@ export default function ExamsPage() {
         title={editingExam ? 'Sửa đề thi' : 'Tạo đề thi mới'}
         maxWidth="lg"
       >
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <AppInput
-                label="Tên đề thi *"
-                type="text"
-                required
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="VD: Kiểm tra Toán Chương 1"
-              />
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Môn học *</label>
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          <AppInput
+            label="Tên đề thi *"
+            type="text"
+            placeholder="VD: Kiểm tra Toán Chương 1"
+            {...register('title')}
+            error={errors.title?.message}
+          />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Môn học *</label>
+            <Controller
+              name="subjectId"
+              control={control}
+              render={({ field }) => (
                 <AppSelect
-                  value={subjectOptions.find(o => o.value === form.subjectId) || null}
-                  onChange={(opt) => setForm({ ...form, subjectId: opt?.value || '' })}
+                  value={subjectOptions.find(o => o.value === field.value) || null}
+                  onChange={(opt) => field.onChange(opt?.value || '')}
                   options={subjectOptions}
                   placeholder="-- Chọn môn --"
                   isClearable
+                  error={errors.subjectId?.message}
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <AppInput
-                  label="Thời gian (phút) *"
-                  type="number"
-                  required
-                  min={1}
-                  value={String(form.duration)}
-                  onChange={(e) => setForm({ ...form, duration: parseInt(e.target.value) || 30 })}
-                />
-                <AppInput
-                  label="Điểm đạt *"
-                  type="number"
-                  min={0}
-                  max={10}
-                  step={0.5}
-                  value={String(form.passingScore)}
-                  onChange={(e) => setForm({ ...form, passingScore: parseFloat(e.target.value) || 5 })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Thời gian mở đề</label>
+              )}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <AppInput
+              label="Thời gian (phút) *"
+              type="number"
+              min={1}
+              {...register('duration', { valueAsNumber: true })}
+              error={errors.duration?.message}
+            />
+            <AppInput
+              label="Điểm đạt *"
+              type="number"
+              min={0}
+              max={10}
+              step={0.5}
+              {...register('passingScore', { valueAsNumber: true })}
+              error={errors.passingScore?.message}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Thời gian mở đề</label>
+              <Controller
+                name="startTime"
+                control={control}
+                render={({ field }) => (
                   <AppDatePicker
-                    value={form.startTime}
-                    onChange={(date) => setForm({ ...form, startTime: date ? date.toISOString() : '' })}
+                    value={field.value}
+                    onChange={(date) => field.onChange(date ? date.toISOString() : '')}
                     placeholder="Chọn thời gian mở đề..."
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Thời gian đóng đề</label>
+                )}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Thời gian đóng đề</label>
+              <Controller
+                name="endTime"
+                control={control}
+                render={({ field }) => (
                   <AppDatePicker
-                    value={form.endTime}
-                    onChange={(date) => setForm({ ...form, endTime: date ? date.toISOString() : '' })}
+                    value={field.value}
+                    onChange={(date) => field.onChange(date ? date.toISOString() : '')}
                     placeholder="Chọn thời gian đóng đề..."
                   />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Mô tả</label>
-                <textarea rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
-              </div>
-              <div className="flex flex-wrap gap-x-6 gap-y-3">
-                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.showAnswer} onChange={(e) => setForm({ ...form, showAnswer: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-slate-700">Cho xem đáp án</span></label>
-                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.shuffleQuestions} onChange={(e) => setForm({ ...form, shuffleQuestions: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-slate-700">Trộn câu hỏi</span></label>
-                <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={form.shuffleOptions} onChange={(e) => setForm({ ...form, shuffleOptions: e.target.checked })} className="w-4 h-4 rounded" /><span className="text-sm text-slate-700">Trộn đáp án</span></label>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>Huỷ</AppButton>
-                <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>{editingExam ? 'Cập nhật' : 'Tạo mới'}</AppButton>
-              </div>
-            </form>
+                )}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Mô tả</label>
+            <textarea
+              rows={2}
+              {...register('description')}
+              className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            />
+          </div>
+          <div className="flex flex-wrap gap-x-6 gap-y-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" {...register('showAnswer')} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+              <span className="text-sm text-slate-700">Cho xem đáp án</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" {...register('shuffleQuestions')} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+              <span className="text-sm text-slate-700">Trộn câu hỏi</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" {...register('shuffleOptions')} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+              <span className="text-sm text-slate-700">Trộn đáp án</span>
+            </label>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>Huỷ</AppButton>
+            <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>{editingExam ? 'Cập nhật' : 'Tạo mới'}</AppButton>
+          </div>
+        </form>
       </AppModal>
 
       <ConfirmModal

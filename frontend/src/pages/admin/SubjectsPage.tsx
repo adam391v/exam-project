@@ -8,6 +8,20 @@ import AppModal from '../../components/AppModal';
 import AppInput from '../../components/AppInput';
 import AppButton from '../../components/AppButton';
 import type { Subject } from '../../types/api.types';
+import { useForm } from 'react-hook-form';
+import type { SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+
+const subjectSchema = z.object({
+  name: z.string().min(1, 'Vui lòng nhập tên môn học'),
+  code: z.string().min(1, 'Vui lòng nhập mã môn học'),
+  description: z.string().optional(),
+  sortOrder: z.number().int(),
+  isActive: z.boolean(),
+});
+
+type SubjectFormValues = z.infer<typeof subjectSchema>;
 
 export default function SubjectsPage() {
   const queryClient = useQueryClient();
@@ -16,7 +30,16 @@ export default function SubjectsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; name: string } | null>(null);
-  const [form, setForm] = useState({ name: '', code: '', description: '', isActive: true, sortOrder: 0 });
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<SubjectFormValues>({
+    resolver: zodResolver(subjectSchema),
+    defaultValues: { name: '', code: '', description: '', isActive: true, sortOrder: 0 },
+  });
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-subjects', page, search],
@@ -54,13 +77,13 @@ export default function SubjectsPage() {
 
   const openCreate = () => {
     setEditingSubject(null);
-    setForm({ name: '', code: '', description: '', isActive: true, sortOrder: 0 });
+    reset({ name: '', code: '', description: '', isActive: true, sortOrder: 0 });
     setShowModal(true);
   };
 
   const openEdit = (subject: Subject) => {
     setEditingSubject(subject);
-    setForm({
+    reset({
       name: subject.name,
       code: subject.code,
       description: subject.description || '',
@@ -75,12 +98,11 @@ export default function SubjectsPage() {
     setEditingSubject(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit: SubmitHandler<SubjectFormValues> = (values) => {
     if (editingSubject) {
-      updateMutation.mutate({ id: editingSubject.id, dto: form });
+      updateMutation.mutate({ id: editingSubject.id, dto: values });
     } else {
-      createMutation.mutate(form);
+      createMutation.mutate(values);
     }
   };
 
@@ -206,53 +228,63 @@ export default function SubjectsPage() {
         title={editingSubject ? 'Sửa môn học' : 'Thêm môn học mới'}
         maxWidth="lg"
       >
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <AppInput
-                label="Tên môn học *"
-                type="text"
-                required
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="VD: Toán học"
+        <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-4">
+          <AppInput
+            label="Tên môn học *"
+            type="text"
+            placeholder="VD: Toán học"
+            {...register('name')}
+            error={errors.name?.message}
+          />
+          <AppInput
+            label="Mã môn *"
+            type="text"
+            placeholder="VD: MATH"
+            className="font-mono"
+            {...register('code', {
+              onChange: (e) => {
+                e.target.value = e.target.value.toUpperCase();
+              }
+            })}
+            error={errors.code?.message}
+          />
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1.5">Mô tả</label>
+            <textarea
+              rows={3}
+              placeholder="Mô tả ngắn..."
+              className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              {...register('description')}
+            />
+          </div>
+          <div className="flex items-center gap-6">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                {...register('isActive')}
               />
+              <span className="text-sm text-slate-700">Hoạt động</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-700">Thứ tự:</label>
               <AppInput
-                label="Mã môn *"
-                type="text"
-                required
-                value={form.code}
-                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-                placeholder="VD: MATH"
-                className="font-mono"
+                type="number"
+                className="w-20 text-center"
+                {...register('sortOrder', { valueAsNumber: true })}
+                error={errors.sortOrder?.message}
               />
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Mô tả</label>
-                <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" placeholder="Mô tả ngắn..." />
-              </div>
-              <div className="flex items-center gap-6">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={form.isActive} onChange={(e) => setForm({ ...form, isActive: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
-                  <span className="text-sm text-slate-700">Hoạt động</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-slate-700">Thứ tự:</label>
-                  <AppInput
-                    type="number"
-                    value={form.sortOrder}
-                    onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })}
-                    className="w-20 text-center"
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 pt-2">
-                <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>
-                  Huỷ
-                </AppButton>
-                <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>
-                  {editingSubject ? 'Cập nhật' : 'Tạo mới'}
-                </AppButton>
-              </div>
-            </form>
+            </div>
+          </div>
+          <div className="flex gap-3 pt-2">
+            <AppButton type="button" variant="secondary" onClick={closeModal} fullWidth>
+              Huỷ
+            </AppButton>
+            <AppButton type="submit" isLoading={createMutation.isPending || updateMutation.isPending} fullWidth>
+              {editingSubject ? 'Cập nhật' : 'Tạo mới'}
+            </AppButton>
+          </div>
+        </form>
       </AppModal>
 
       <ConfirmModal
