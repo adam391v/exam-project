@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { subjectService, examService } from '../../services/data.service';
 import { Search, Clock, FileText, Users, BookOpen, ArrowRight, Sparkles } from 'lucide-react';
+import AppInput from '../../components/AppInput';
 import type { Subject, Exam } from '../../types/api.types';
 
 export default function HomePage() {
@@ -43,16 +44,14 @@ export default function HomePage() {
 
             {/* Search Bar */}
             <div className="max-w-xl mx-auto">
-              <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Tìm kiếm đề thi..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-white text-slate-900 placeholder-slate-400 shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-300/50 text-sm"
-                />
-              </div>
+              <AppInput
+                type="text"
+                placeholder="Tìm kiếm đề thi..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                icon={<Search className="w-5 h-5 text-slate-400" />}
+                className="py-3.5 rounded-2xl shadow-xl focus:ring-4 focus:ring-blue-300/50"
+              />
             </div>
           </div>
         </div>

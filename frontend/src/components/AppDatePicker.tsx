@@ -1,10 +1,12 @@
-import React, { forwardRef, ComponentProps } from 'react';
-import DatePicker from 'react-datepicker';
+import { forwardRef } from 'react';
+import type { ComponentProps } from 'react';
+import ReactDatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { vi } from 'date-fns/locale';
 import { Calendar } from 'lucide-react';
+import AppInput from './AppInput';
 
-interface AppDatePickerProps extends Omit<ComponentProps<typeof DatePicker>, 'onChange'> {
+interface AppDatePickerProps extends Omit<ComponentProps<typeof ReactDatePicker>, 'onChange' | 'value'> {
   value?: string | null;
   onChange: (date: Date | null) => void;
   placeholder?: string;
@@ -16,17 +18,15 @@ const AppDatePicker = forwardRef<any, AppDatePickerProps>(
     
     const CustomInput = forwardRef<HTMLInputElement, any>(
       ({ value: inputValue, onClick, placeholder: inputPlaceholder }, inputRef) => (
-        <div className={`relative w-full ${className}`}>
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Calendar className="h-4 w-4 text-slate-400" />
-          </div>
-          <input
+        <div className={`w-full ${className}`}>
+          <AppInput
             ref={inputRef}
             value={inputValue}
             onClick={onClick}
             onChange={() => {}}
             placeholder={inputPlaceholder}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white transition-all cursor-pointer hover:border-slate-400"
+            className="cursor-pointer hover:border-slate-400 bg-white"
+            icon={<Calendar className="w-4 h-4" />}
             readOnly
           />
         </div>
@@ -48,16 +48,16 @@ const AppDatePicker = forwardRef<any, AppDatePickerProps>(
     };
 
     return (
-      <DatePicker
+      <ReactDatePicker
         ref={ref}
         selected={currentDate}
-        onChange={(date) => onChange(date)}
+        onChange={(date: any) => onChange(date)}
         locale={vi}
         dateFormat="dd/MM/yyyy HH:mm"
         customInput={<CustomInput placeholder={placeholder} />}
         isClearable
         wrapperClassName="w-full"
-        {...props}
+        {...(props as any)}
       >
         {/* Custom Time Picker */}
         <div className="flex items-center justify-center gap-2 p-3 border-t border-slate-200 bg-slate-50 mt-2">
@@ -82,7 +82,7 @@ const AppDatePicker = forwardRef<any, AppDatePickerProps>(
             ))}
           </select>
         </div>
-      </DatePicker>
+      </ReactDatePicker>
     );
   }
 );

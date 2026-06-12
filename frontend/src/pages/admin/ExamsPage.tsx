@@ -5,9 +5,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { adminExamService, adminSubjectService } from '../../services/data.service';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Search, X, FileText, CheckCircle, Eye, Link } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, FileText, Eye, Link } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import AppModal from '../../components/AppModal';
+import AppInput from '../../components/AppInput';
 import type { Exam } from '../../types/api.types';
 
 export default function ExamsPage() {
@@ -120,10 +121,16 @@ export default function ExamsPage() {
         </button>
       </div>
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input type="text" placeholder="Tìm đề thi..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1 max-w-sm">
+          <AppInput
+            type="text"
+            placeholder="Tìm đề thi..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            icon={<Search className="w-4 h-4" />}
+          />
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -183,7 +190,6 @@ export default function ExamsPage() {
         )}
       </div>
 
-      {/* Create/Edit Modal */}
       <AppModal
         isOpen={showModal}
         onClose={closeModal}
@@ -191,10 +197,14 @@ export default function ExamsPage() {
         maxWidth="lg"
       >
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Tên đề thi *</label>
-                <input type="text" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="VD: Kiểm tra Toán Chương 1" />
-              </div>
+              <AppInput
+                label="Tên đề thi *"
+                type="text"
+                required
+                value={form.title}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="VD: Kiểm tra Toán Chương 1"
+              />
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Môn học *</label>
                 <AppSelect
@@ -206,14 +216,23 @@ export default function ExamsPage() {
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Thời gian (phút) *</label>
-                  <input type="number" required min={1} value={form.duration} onChange={(e) => setForm({ ...form, duration: parseInt(e.target.value) || 30 })} className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">Điểm đạt</label>
-                  <input type="number" min={0} max={10} step={0.5} value={form.passingScore} onChange={(e) => setForm({ ...form, passingScore: parseFloat(e.target.value) || 5 })} className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                </div>
+                <AppInput
+                  label="Thời gian (phút) *"
+                  type="number"
+                  required
+                  min={1}
+                  value={String(form.duration)}
+                  onChange={(e) => setForm({ ...form, duration: parseInt(e.target.value) || 30 })}
+                />
+                <AppInput
+                  label="Điểm đạt *"
+                  type="number"
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  value={String(form.passingScore)}
+                  onChange={(e) => setForm({ ...form, passingScore: parseFloat(e.target.value) || 5 })}
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>

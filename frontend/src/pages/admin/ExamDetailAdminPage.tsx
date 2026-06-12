@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import AppModal from '../../components/AppModal';
+import AppInput from '../../components/AppInput';
 
 // ===== Interfaces =====
 interface QuestionOption {
@@ -615,11 +616,13 @@ export default function ExamDetailAdminPage() {
                   <label className="block text-xs font-medium text-slate-600 mb-1">Audio</label>
                   <FileUploadInput type="audio" value={form.audioUrl} onChange={(url) => setForm({ ...form, audioUrl: url })} />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Link YouTube</label>
-                  <input type="url" value={form.youtubeUrl} onChange={(e) => setForm({ ...form, youtubeUrl: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://youtube.com/..." />
-                </div>
+                <AppInput
+                  label="Link YouTube"
+                  type="url"
+                  value={form.youtubeUrl}
+                  onChange={(e) => setForm({ ...form, youtubeUrl: e.target.value })}
+                  placeholder="https://youtube.com/..."
+                />
               </div>
             </div>
 
@@ -703,11 +706,13 @@ export default function ExamDetailAdminPage() {
             {/* Group Info */}
             <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 space-y-4">
               <p className="text-sm font-semibold text-purple-800">📖 Thông tin nội dung chung</p>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Tiêu đề nhóm</label>
-                <input type="text" value={groupForm.title} onChange={(e) => setGroupForm({ ...groupForm, title: e.target.value })}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="VD: Đọc hiểu đoạn văn..." />
-              </div>
+              <AppInput
+                label="Tiêu đề nhóm"
+                type="text"
+                value={groupForm.title}
+                onChange={(e) => setGroupForm({ ...groupForm, title: e.target.value })}
+                placeholder="VD: Đọc hiểu đoạn văn..."
+              />
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Nội dung chung * (Rich Text + LaTeX)</label>
                 <RichTextEditor content={groupForm.content} onChange={(html) => setGroupForm({ ...groupForm, content: html })} placeholder="Nhập đoạn văn, bài toán, bảng dữ liệu..." />
@@ -722,11 +727,13 @@ export default function ExamDetailAdminPage() {
                   <label className="block text-xs font-medium text-slate-600 mb-1">Audio</label>
                   <FileUploadInput type="audio" value={groupForm.audioUrl} onChange={(url) => setGroupForm({ ...groupForm, audioUrl: url })} />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-600 mb-1">Link YouTube</label>
-                  <input type="url" value={groupForm.youtubeUrl} onChange={(e) => setGroupForm({ ...groupForm, youtubeUrl: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="https://youtube.com/..." />
-                </div>
+                <AppInput
+                  label="Link YouTube"
+                  type="url"
+                  value={groupForm.youtubeUrl}
+                  onChange={(e) => setGroupForm({ ...groupForm, youtubeUrl: e.target.value })}
+                  placeholder="https://youtube.com/..."
+                />
               </div>
             </div>
 

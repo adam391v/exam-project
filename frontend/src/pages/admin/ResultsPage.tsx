@@ -4,6 +4,7 @@ import { adminResultService, classroomService } from '../../services/data.servic
 import { toast } from 'sonner';
 import { Search, Trash2, Eye, ClipboardList, ArrowLeft, Users, Clock, Download } from 'lucide-react';
 import AppSelect from '../../components/AppSelect';
+import AppInput from '../../components/AppInput';
 import ConfirmModal from '../../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
@@ -243,9 +244,13 @@ export default function ResultsPage() {
         </div>
 
         <div className="relative max-w-sm flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Tìm theo lớp, đề thi, môn..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+          <AppInput
+            type="text"
+            placeholder="Tìm theo lớp, đề thi, môn..."
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+            icon={<Search className="w-4 h-4" />}
+          />
         </div>
       </div>
 

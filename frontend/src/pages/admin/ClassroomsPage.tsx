@@ -3,9 +3,10 @@ import AppSelect from '../../components/AppSelect';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminClassroomService } from '../../services/data.service';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Search, X, School } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, School } from 'lucide-react';
 import ConfirmModal from '../../components/ConfirmModal';
 import AppModal from '../../components/AppModal';
+import AppInput from '../../components/AppInput';
 
 // Options khối 1-12
 const gradeOptions = Array.from({ length: 12 }, (_, i) => ({
@@ -96,12 +97,16 @@ export default function ClassroomsPage() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Tìm tên lớp..." value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
-        </div>
+      {/* Search */}
+      <div className="max-w-sm">
+        <AppInput 
+          type="text" 
+          placeholder="Tìm tên lớp..." 
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          icon={<Search className="w-4 h-4" />}
+        />
+      </div>
         <div className="w-48">
           <AppSelect
             value={filterGrade ? gradeOptions.find(o => o.value === String(filterGrade)) || null : null}
@@ -186,17 +191,20 @@ export default function ClassroomsPage() {
                   isSearchable={false}
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Tên lớp *</label>
-                <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="VD: 12A1, 10B2" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Thứ tự sắp xếp</label>
-                <input type="number" value={form.sortOrder} onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              </div>
+              <AppInput
+                label="Tên lớp *"
+                type="text"
+                required
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="VD: Lớp 10A1"
+              />
+              <AppInput
+                label="Thứ tự sắp xếp"
+                type="number"
+                value={String(form.sortOrder)}
+                onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })}
+              />
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={closeModal} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all">Huỷ</button>
                 <button type="submit" disabled={createMutation.isPending || updateMutation.isPending}

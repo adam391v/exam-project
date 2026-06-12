@@ -18,6 +18,7 @@ import {
   EyeOff,
   Maximize,
 } from 'lucide-react';
+import AppInput from '../../components/AppInput';
 import type { ExamSessionStart, ExamAnswer } from '../../types/api.types';
 
 // ===== Types cho structured items =====
@@ -884,13 +885,14 @@ export default function TakeExamPage() {
               {item.options.map((_, idx) => (
                 <div key={idx} className="flex items-center gap-3">
                   <span className="w-8 h-8 flex-shrink-0 bg-slate-100 rounded-full flex items-center justify-center text-sm font-bold text-slate-600">{idx + 1}</span>
-                  <input
+                  <AppInput
                     type="text"
                     value={textArr[idx] || ''}
                     onChange={(e) => handleTextAnswer(item.id, idx, e.target.value, item.options.length)}
                     onBlur={() => handleTextAnswerBlur(item.id)}
                     placeholder={`Nhập đáp án cho ô trống ${idx + 1}...`}
-                    className="flex-1 rounded-xl border-2 border-slate-200 px-4 py-3 text-base text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-400"
+                    containerClassName="flex-1"
+                    className="border-2 border-slate-200 px-4 py-3 text-base text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-400"
                     disabled={isTimeUp}
                   />
                 </div>
@@ -1004,13 +1006,14 @@ export default function TakeExamPage() {
                         {sq.options.map((_, idx) => (
                           <div key={idx} className="flex items-center gap-3">
                             <span className="w-7 h-7 flex-shrink-0 bg-slate-100 rounded-full flex items-center justify-center text-xs font-bold text-slate-600">{idx + 1}</span>
-                            <input
+                            <AppInput
                               type="text"
                               value={textArr[idx] || ''}
                               onChange={(e) => handleTextAnswer(sq.id, idx, e.target.value, sq.options.length)}
                               onBlur={() => handleTextAnswerBlur(sq.id)}
                               placeholder={`Đáp án ô ${idx + 1}...`}
-                              className="flex-1 rounded-lg border-2 border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-400"
+                              containerClassName="flex-1"
+                              className="border-2 border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all placeholder:text-slate-400"
                               disabled={isTimeUp}
                             />
                           </div>

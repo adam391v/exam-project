@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { examService, examSessionService, classroomService } from '../../services/data.service';
 import { toast } from 'sonner';
 import { Clock, FileText, BookOpen, ArrowLeft, User, GraduationCap } from 'lucide-react';
+import AppInput from '../../components/AppInput';
 import AppSelect from '../../components/AppSelect';
 
 // Options khối 1-12
@@ -201,19 +202,18 @@ export default function ExamDetailPage() {
           <h2 className="text-lg font-semibold text-slate-900 mb-6">Thông tin học sinh</h2>
 
           <div className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                <User className="w-4 h-4 inline mr-1.5 text-slate-400" />
-                Họ và tên
-              </label>
-              <input
-                type="text"
-                placeholder="Nhập họ và tên của bạn"
-                value={studentName}
-                onChange={(e) => setStudentName(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-              />
-            </div>
+            <AppInput
+              label={
+                <span className="flex items-center">
+                  <User className="w-4 h-4 inline mr-1.5 text-slate-400" />
+                  Họ và tên
+                </span> as any
+              }
+              type="text"
+              placeholder="Nhập họ và tên của bạn"
+              value={studentName}
+              onChange={(e) => setStudentName(e.target.value)}
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>

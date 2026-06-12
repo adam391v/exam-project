@@ -66,6 +66,9 @@ export interface Exam {
   status: ExamStatus;
   isPublic: boolean;
   showAnswer: boolean;
+  shuffleQuestions?: boolean;
+  shuffleOptions?: boolean;
+  passingScore?: number;
   description?: string;
   startTime?: string;
   endTime?: string;

@@ -3,27 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import { authService } from '../../services/auth.service';
 import { useAuthStore } from '../../stores/auth.store';
 import { toast } from 'sonner';
-import { BookOpen, Eye, EyeOff, LogIn } from 'lucide-react';
+import { BookOpen, LogIn } from 'lucide-react';
+import AppInput from '../../components/AppInput';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((s) => s.setAuth);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState({ username: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!username.trim() || !password.trim()) {
+    if (!form.username.trim() || !form.password.trim()) {
       toast.error('Vui lòng nhập đầy đủ thông tin');
       return;
     }
 
     setIsLoading(true);
     try {
-      const data = await authService.login(username, password);
+      const data = await authService.login(form.username, form.password);
       setAuth(data.accessToken, data.user);
       toast.success(`Xin chào, ${data.user.fullName}!`);
       navigate('/admin/dashboard');
@@ -49,41 +48,23 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleLogin} className="bg-white rounded-2xl shadow-xl border border-slate-200 p-8">
           <div className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Tên đăng nhập
-              </label>
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Nhập tên đăng nhập"
-                className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                autoFocus
-              />
-            </div>
+            <AppInput
+              label="Tên đăng nhập"
+              type="text"
+              required
+              value={form.username}
+              onChange={(e) => setForm({ ...form, username: e.target.value })}
+              placeholder="Nhập tên đăng nhập"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Mật khẩu
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Nhập mật khẩu"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 pr-11 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
+            <AppInput
+              label="Mật khẩu"
+              type="password"
+              required
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+              placeholder="••••••••"
+            />
 
             <button
               type="submit"
