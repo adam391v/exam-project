@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminClassroomService } from '../../services/data.service';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search, X, School } from 'lucide-react';
+import ConfirmModal from '../../components/ConfirmModal';
+import AppModal from '../../components/AppModal';
 
 // Options khối 1-12
 const gradeOptions = Array.from({ length: 12 }, (_, i) => ({
@@ -26,6 +28,7 @@ export default function ClassroomsPage() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; name: string } | null>(null);
   const [form, setForm] = useState<ClassroomForm>({ ...defaultForm });
 
   const { data, isLoading } = useQuery({
@@ -146,7 +149,7 @@ export default function ClassroomsPage() {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => openEdit(c)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => { if (window.confirm('Xoá lớp học này?')) deleteMutation.mutate(c.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => setConfirmDelete({ isOpen: true, id: c.id, name: c.name })} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -166,14 +169,13 @@ export default function ClassroomsPage() {
       </div>
 
       {/* Modal Thêm/Sửa */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-900">{editingId ? 'Sửa lớp học' : 'Thêm lớp học mới'}</h3>
-              <button onClick={closeModal} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      <AppModal
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingId ? 'Sửa lớp học' : 'Thêm lớp học mới'}
+        maxWidth="md"
+      >
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Khối *</label>
                 <AppSelect
@@ -203,9 +205,20 @@ export default function ClassroomsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </AppModal>
+
+      <ConfirmModal
+        isOpen={!!confirmDelete?.isOpen}
+        title="Xác nhận xoá lớp học"
+        message={`Bạn có chắc chắn muốn xoá lớp "${confirmDelete?.name}"? Các kết quả thi liên quan cũng sẽ bị ảnh hưởng. Hành động này không thể hoàn tác.`}
+        onConfirm={() => {
+          if (confirmDelete?.id) {
+            deleteMutation.mutate(confirmDelete.id);
+            setConfirmDelete(null);
+          }
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

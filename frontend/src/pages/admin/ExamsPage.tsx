@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { adminExamService, adminSubjectService } from '../../services/data.service';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search, X, FileText, CheckCircle, Eye, Link } from 'lucide-react';
+import ConfirmModal from '../../components/ConfirmModal';
+import AppModal from '../../components/AppModal';
 import type { Exam } from '../../types/api.types';
 
 export default function ExamsPage() {
@@ -15,6 +17,7 @@ export default function ExamsPage() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; name: string } | null>(null);
   const [form, setForm] = useState({
     title: '', subjectId: '', duration: 30, description: '', isPublic: false,
     showAnswer: true, shuffleQuestions: false, shuffleOptions: false, passingScore: 5,
@@ -161,7 +164,7 @@ export default function ExamsPage() {
                       <button onClick={() => navigate(`/admin/exams/${exam.id}`)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Xem chi tiết"><Eye className="w-4 h-4" /></button>
                       <button onClick={(e) => { e.stopPropagation(); const url = `${window.location.origin}/exams/${exam.id}`; navigator.clipboard.writeText(url); toast.success('Đã copy link làm bài!'); if (exam.status === 'DRAFT') publishMutation.mutate(exam.id); }} className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all" title="Xuất bản & Copy link"><Link className="w-4 h-4" /></button>
                       <button onClick={(e) => { e.stopPropagation(); openEdit(exam); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Sửa"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => { if (window.confirm('Xoá đề thi?')) deleteMutation.mutate(exam.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Xoá"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => setConfirmDelete({ isOpen: true, id: exam.id, name: exam.title })} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Xoá"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -181,14 +184,13 @@ export default function ExamsPage() {
       </div>
 
       {/* Create/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-in">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white">
-              <h3 className="text-lg font-bold text-slate-900">{editingExam ? 'Sửa đề thi' : 'Tạo đề thi mới'}</h3>
-              <button onClick={closeModal} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      <AppModal
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingExam ? 'Sửa đề thi' : 'Tạo đề thi mới'}
+        maxWidth="lg"
+      >
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Tên đề thi *</label>
                 <input type="text" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="VD: Kiểm tra Toán Chương 1" />
@@ -245,9 +247,20 @@ export default function ExamsPage() {
                 <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">{editingExam ? 'Cập nhật' : 'Tạo mới'}</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </AppModal>
+
+      <ConfirmModal
+        isOpen={!!confirmDelete?.isOpen}
+        title="Xác nhận xoá đề thi"
+        message={`Bạn có chắc chắn muốn xoá đề thi "${confirmDelete?.name}"? Mọi kết quả thi và câu hỏi liên quan sẽ bị xoá vĩnh viễn.`}
+        onConfirm={() => {
+          if (confirmDelete?.id) {
+            deleteMutation.mutate(confirmDelete.id);
+            setConfirmDelete(null);
+          }
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

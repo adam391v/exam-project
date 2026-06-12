@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminUserService } from '../../services/data.service';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search, X, Users } from 'lucide-react';
+import ConfirmModal from '../../components/ConfirmModal';
+import AppModal from '../../components/AppModal';
 
 export default function AdminUsersPage() {
   const queryClient = useQueryClient();
@@ -11,6 +13,7 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; name: string } | null>(null);
   const [form, setForm] = useState({ username: '', password: '', fullName: '', email: '', role: 'ADMIN', isActive: true });
 
   const { data, isLoading } = useQuery({
@@ -117,7 +120,7 @@ export default function AdminUsersPage() {
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => openEdit(user)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => { if (window.confirm('Xoá tài khoản?')) deleteMutation.mutate(user.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => setConfirmDelete({ isOpen: true, id: user.id, name: user.fullName })} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </td>
                 </tr>
@@ -136,14 +139,14 @@ export default function AdminUsersPage() {
         )}
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-fade-in">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-900">{editingId ? 'Sửa tài khoản' : 'Thêm tài khoản mới'}</h3>
-              <button onClick={closeModal} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      {/* Modal */}
+      <AppModal
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingId ? 'Sửa tài khoản' : 'Thêm tài khoản mới'}
+        maxWidth="lg"
+      >
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
               {!editingId && (
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Username *</label>
@@ -187,9 +190,20 @@ export default function AdminUsersPage() {
                 <button type="submit" disabled={createMutation.isPending || updateMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">{editingId ? 'Cập nhật' : 'Tạo mới'}</button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </AppModal>
+
+      <ConfirmModal
+        isOpen={!!confirmDelete?.isOpen}
+        title="Xác nhận xoá tài khoản"
+        message={`Bạn có chắc chắn muốn xoá tài khoản "${confirmDelete?.name}"? Hành động này không thể hoàn tác.`}
+        onConfirm={() => {
+          if (confirmDelete?.id) {
+            deleteMutation.mutate(confirmDelete.id);
+            setConfirmDelete(null);
+          }
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

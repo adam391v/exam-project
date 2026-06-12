@@ -24,6 +24,8 @@ import {
   Layers,
   Link as LinkIcon,
 } from 'lucide-react';
+import ConfirmModal from '../../components/ConfirmModal';
+import AppModal from '../../components/AppModal';
 
 // ===== Interfaces =====
 interface QuestionOption {
@@ -96,6 +98,7 @@ export default function ExamDetailAdminPage() {
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; type: 'question' | 'group' } | null>(null);
   const [form, setForm] = useState<QuestionForm>({ ...defaultForm });
   const [groupForm, setGroupForm] = useState<GroupForm>({ ...defaultGroupForm });
 
@@ -420,6 +423,23 @@ export default function ExamDetailAdminPage() {
 
       {/* ===== Import Modal ===== */}
       {showImportModal && renderImportModal()}
+
+      <ConfirmModal
+        isOpen={!!confirmDelete?.isOpen}
+        title={confirmDelete?.type === 'group' ? 'Xác nhận xoá nhóm câu hỏi' : 'Xác nhận xoá câu hỏi'}
+        message={confirmDelete?.type === 'group' ? 'Bạn có chắc chắn muốn xoá toàn bộ nhóm câu hỏi này cùng các câu con?' : 'Bạn có chắc chắn muốn xoá câu hỏi này?'}
+        onConfirm={() => {
+          if (confirmDelete?.id) {
+            if (confirmDelete.type === 'group') {
+              deleteGroupMutation.mutate(confirmDelete.id);
+            } else {
+              deleteMutation.mutate(confirmDelete.id);
+            }
+            setConfirmDelete(null);
+          }
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 
@@ -477,7 +497,7 @@ export default function ExamDetailAdminPage() {
                 <button onClick={(e) => { e.stopPropagation(); openEdit(q); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all">
                   <Pencil className="w-3.5 h-3.5" /> Sửa
                 </button>
-                <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Xoá câu hỏi này?')) deleteMutation.mutate(q.id); }}
+                <button onClick={(e) => { e.stopPropagation(); setConfirmDelete({ isOpen: true, id: q.id, type: 'question' }); }}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 transition-all">
                   <Trash2 className="w-3.5 h-3.5" /> Xoá
                 </button>
@@ -510,7 +530,7 @@ export default function ExamDetailAdminPage() {
             <button onClick={(e) => { e.stopPropagation(); openEditGroup(g); }} className="p-1.5 text-purple-400 hover:text-purple-600 hover:bg-purple-100 rounded-lg transition-all">
               <Pencil className="w-3.5 h-3.5" />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); if (window.confirm('Xoá nhóm câu hỏi?')) deleteGroupMutation.mutate(g.id); }} className="p-1.5 text-purple-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
+            <button onClick={(e) => { e.stopPropagation(); setConfirmDelete({ isOpen: true, id: g.id, type: 'group' }); }} className="p-1.5 text-purple-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
             {isExpanded ? <ChevronUp className="w-4 h-4 text-purple-400" /> : <ChevronDown className="w-4 h-4 text-purple-400" />}
@@ -558,13 +578,13 @@ export default function ExamDetailAdminPage() {
 
   function renderQuestionModal() {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white z-10">
-            <h3 className="text-lg font-bold text-slate-900">{editingQuestionId ? 'Sửa câu hỏi' : 'Thêm câu hỏi mới'}</h3>
-            <button onClick={closeModal} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-          </div>
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      <AppModal
+        isOpen={showQuestionModal}
+        onClose={closeModal}
+        title={editingQuestionId ? 'Sửa câu hỏi' : 'Thêm câu hỏi mới'}
+        maxWidth="2xl"
+      >
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Loại câu hỏi</label>
               <AppSelect
@@ -662,23 +682,24 @@ export default function ExamDetailAdminPage() {
               <button type="submit" disabled={addMutation.isPending || updateMutation.isPending} className="flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition-all">{editingQuestionId ? 'Cập nhật' : 'Tạo mới'}</button>
             </div>
           </form>
-        </div>
-      </div>
+      </AppModal>
     );
   }
 
   function renderGroupModal() {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-fade-in">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 sticky top-0 bg-white z-10">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-purple-600" />
-              {editingGroupId ? 'Sửa câu hỏi chùm' : 'Thêm câu hỏi chùm'}
-            </h3>
-            <button onClick={closeGroupModal} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+      <AppModal
+        isOpen={showGroupModal}
+        onClose={closeGroupModal}
+        title={
+          <div className="flex items-center gap-2">
+            <Layers className="w-5 h-5 text-purple-600" />
+            {editingGroupId ? 'Sửa câu hỏi chùm' : 'Thêm câu hỏi chùm'}
           </div>
-          <form onSubmit={handleGroupSubmit} className="p-6 space-y-5">
+        }
+        maxWidth="4xl"
+      >
+        <form onSubmit={handleGroupSubmit} className="p-6 space-y-5">
             {/* Group Info */}
             <div className="p-4 bg-purple-50 rounded-xl border border-purple-100 space-y-4">
               <p className="text-sm font-semibold text-purple-800">📖 Thông tin nội dung chung</p>
@@ -762,20 +783,19 @@ export default function ExamDetailAdminPage() {
               </button>
             </div>
           </form>
-        </div>
-      </div>
+      </AppModal>
     );
   }
 
   function renderImportModal() {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-            <h3 className="text-lg font-bold text-slate-900">Import câu hỏi từ Excel</h3>
-            <button onClick={() => setShowImportModal(false)} className="p-1 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
-          </div>
-          <div className="p-6 space-y-4">
+      <AppModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        title="Import câu hỏi từ Excel"
+        maxWidth="md"
+      >
+        <div className="p-6 space-y-4">
             <div className="bg-blue-50 rounded-xl p-4 space-y-2">
               <p className="text-xs text-blue-700 font-medium">Format câu đơn (7 cột):</p>
               <p className="text-xs text-blue-600">Câu hỏi | A | B | C | D | Đáp án đúng | Giải thích</p>
@@ -795,8 +815,7 @@ export default function ExamDetailAdminPage() {
               </button>
             </div>
           </div>
-        </div>
-      </div>
+      </AppModal>
     );
   }
 }

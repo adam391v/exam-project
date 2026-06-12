@@ -4,6 +4,7 @@ import { adminResultService, classroomService } from '../../services/data.servic
 import { toast } from 'sonner';
 import { Search, Trash2, Eye, ClipboardList, ArrowLeft, Users, Clock, Download } from 'lucide-react';
 import AppSelect from '../../components/AppSelect';
+import ConfirmModal from '../../components/ConfirmModal';
 import * as XLSX from 'xlsx';
 
 // Options khối 1-12
@@ -40,6 +41,7 @@ export default function ResultsPage() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; name?: string } | null>(null);
   // Chi tiết lớp
   const [classDetail, setClassDetail] = useState<{ studentClass: string; examId: string; examTitle: string; subjectName: string } | null>(null);
 
@@ -187,7 +189,7 @@ export default function ResultsPage() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <a href={`/results/${s.id}`} target="_blank" rel="noopener noreferrer" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all" title="Xem chi tiết"><Eye className="w-4 h-4" /></a>
-                        <button onClick={() => { if (window.confirm('Xoá kết quả?')) deleteMutation.mutate(s.id); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Xoá"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => setConfirmDelete({ isOpen: true, id: s.id, name: s.studentName })} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all" title="Xoá"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </td>
                   </tr>
@@ -314,6 +316,19 @@ export default function ResultsPage() {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={!!confirmDelete?.isOpen}
+        title="Xác nhận xoá kết quả"
+        message={`Bạn có chắc chắn muốn xoá bài thi của học sinh "${confirmDelete?.name}"? Hành động này không thể hoàn tác.`}
+        onConfirm={() => {
+          if (confirmDelete?.id) {
+            deleteMutation.mutate(confirmDelete.id);
+            setConfirmDelete(null);
+          }
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

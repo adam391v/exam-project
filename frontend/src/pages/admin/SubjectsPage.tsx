@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminSubjectService } from '../../services/data.service';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, Search, X, BookOpen } from 'lucide-react';
+import ConfirmModal from '../../components/ConfirmModal';
+import AppModal from '../../components/AppModal';
 import type { Subject } from '../../types/api.types';
 
 export default function SubjectsPage() {
@@ -11,6 +13,7 @@ export default function SubjectsPage() {
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: string; name: string } | null>(null);
   const [form, setForm] = useState({ name: '', code: '', description: '', isActive: true, sortOrder: 0 });
 
   const { data, isLoading } = useQuery({
@@ -80,9 +83,7 @@ export default function SubjectsPage() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`Bạn có chắc muốn xoá môn "${name}"?`)) {
-      deleteMutation.mutate(id);
-    }
+    setConfirmDelete({ isOpen: true, id, name });
   };
 
   return (
@@ -200,18 +201,13 @@ export default function SubjectsPage() {
       </div>
 
       {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-fade-in">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-900">
-                {editingSubject ? 'Sửa môn học' : 'Thêm môn học mới'}
-              </h3>
-              <button onClick={closeModal} className="p-1 text-slate-400 hover:text-slate-600">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      <AppModal
+        isOpen={showModal}
+        onClose={closeModal}
+        title={editingSubject ? 'Sửa môn học' : 'Thêm môn học mới'}
+        maxWidth="lg"
+      >
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Tên môn học *</label>
                 <input type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -248,9 +244,20 @@ export default function SubjectsPage() {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </AppModal>
+
+      <ConfirmModal
+        isOpen={!!confirmDelete?.isOpen}
+        title="Xác nhận xoá môn học"
+        message={`Bạn có chắc chắn muốn xoá môn "${confirmDelete?.name}"? Hành động này không thể hoàn tác.`}
+        onConfirm={() => {
+          if (confirmDelete?.id) {
+            deleteMutation.mutate(confirmDelete.id);
+            setConfirmDelete(null);
+          }
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }
